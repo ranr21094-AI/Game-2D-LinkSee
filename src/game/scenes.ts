@@ -2,14 +2,15 @@ import Phaser from "phaser";
 import busStopUrl from "../assets/bus-stop.png";
 import busInteriorUrl from "../assets/bus-interior.png";
 import busRideUrl from "../assets/bus-ride.png";
+import crossingUrl from "../assets/old-city-crossing.png";
 import oldCityUrl from "../assets/old-city.png";
 import travelerUrl from "../assets/traveler.png";
 import { audioDirector } from "./audio";
-import { OBJECTIVES, PATHS, REVEAL_PROFILE, SCENE_LABELS } from "./content";
+import { OBJECTIVES, OLD_CITY_CROSSING, OLD_CITY_HANDRAIL, PATHS, REVEAL_PROFILE, SCENE_LABELS } from "./content";
 import { gameEvents } from "./events";
-import { determineEnding, transitionBus } from "./flow";
+import { constrainCrossingPosition, determineEnding, transitionBus, transitionCrossing } from "./flow";
 import { collectMemory, finishGame, getSnapshot, patchSnapshot, setCheckpoint } from "./store";
-import type { BusTransitState, HudState, SceneId, TactilePathDefinition, TactilePathNode } from "./types";
+import type { BusTransitState, CrossingState, HudState, SceneId, TactilePathDefinition, TactilePathNode } from "./types";
 
 type Facing = "up" | "down" | "left" | "right";
 type RevealMode = "tap" | "sweep" | "hint" | null;
@@ -30,6 +31,14 @@ function pointSegmentDistance(point: Phaser.Math.Vector2, a: TactilePathNode, b:
   return Phaser.Math.Distance.Between(point.x, point.y, a.x + ab.x * t, a.y + ab.y * t);
 }
 
+function projectToSegment(point: Phaser.Math.Vector2, start: { x: number; y: number }, end: { x: number; y: number }): { point: Phaser.Math.Vector2; t: number; distance: number } {
+  const segment = new Phaser.Math.Vector2(end.x - start.x, end.y - start.y);
+  const relative = new Phaser.Math.Vector2(point.x - start.x, point.y - start.y);
+  const t = Phaser.Math.Clamp(relative.dot(segment) / Math.max(1, segment.lengthSq()), 0, 1);
+  const projected = new Phaser.Math.Vector2(start.x + segment.x * t, start.y + segment.y * t);
+  return { point: projected, t, distance: Phaser.Math.Distance.Between(point.x, point.y, projected.x, projected.y) };
+}
+
 abstract class WalkScene extends Phaser.Scene {
   protected abstract sceneId: Exclude<SceneId, "bus-ride">;
   protected abstract backgroundKey: string;
@@ -47,6 +56,7 @@ abstract class WalkScene extends Phaser.Scene {
   protected keys!: Record<string, Phaser.Input.Keyboard.Key>;
   protected prompt = "";
   protected subtitle = "";
+  protected trackDetours = true;
   private previousHud = "";
   private lastDetourAt = 0;
   private wasOnRoute = true;
@@ -86,9 +96,22 @@ abstract class WalkScene extends Phaser.Scene {
     }) as Record<string, Phaser.Input.Keyboard.Key>;
     this.input.keyboard?.addCapture(["SPACE", "SHIFT", "Q", "E"]);
     if (import.meta.env.DEV) {
-      this.cleanupDevEvents.push(gameEvents.on("devTeleport", (point) => this.player.setPosition(point.x, point.y)));
+      this.cleanupDevEvents.push(gameEvents.on("devTeleport", (point) => {
+        this.player.setPosition(point.x, point.y);
+        this.revealMode = "sweep";
+        this.revealUntil = this.time.now + 5000;
+        this.onSweep(this.time.now);
+      }));
       this.cleanupDevEvents.push(gameEvents.on("devInteract", () => { this.devInteractRequested = true; }));
-      this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanupDevEvents.splice(0).forEach((off) => off()));
+      this.cleanupDevEvents.push(gameEvents.on("devReveal", (mode) => {
+        this.revealMode = mode;
+        this.revealUntil = this.time.now + 5000;
+        if (mode === "sweep") this.onSweep(this.time.now);
+        else this.onHint(this.time.now);
+      }));
+      const cleanup = () => this.cleanupDevEvents.splice(0).forEach((off) => off());
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, cleanup);
+      this.events.once(Phaser.Scenes.Events.DESTROY, cleanup);
     }
     setCheckpoint(this.sceneId);
     gameEvents.emit("scene", this.sceneId);
@@ -96,6 +119,8 @@ abstract class WalkScene extends Phaser.Scene {
     if (import.meta.env.DEV && sessionStorage.getItem("sound-road-dev-reveal")) {
       this.revealMode = sessionStorage.getItem("sound-road-dev-reveal") === "sweep" ? "sweep" : "hint";
       this.revealUntil = this.time.now + 60_000;
+      if (this.revealMode === "sweep") this.onSweep(this.time.now);
+      else this.onHint(this.time.now);
     }
     this.emitHud();
   }
@@ -138,16 +163,44 @@ abstract class WalkScene extends Phaser.Scene {
     });
   }
 
+  protected getMovementInput(): Phaser.Math.Vector2 {
+    return new Phaser.Math.Vector2(
+      Number(this.keys.right.isDown) - Number(this.keys.left.isDown),
+      Number(this.keys.down.isDown) - Number(this.keys.up.isDown),
+    );
+  }
+
+  protected constrainMovement(_current: Phaser.Math.Vector2, next: Phaser.Math.Vector2): Phaser.Math.Vector2 {
+    return new Phaser.Math.Vector2(Phaser.Math.Clamp(next.x, 24, 616), Phaser.Math.Clamp(next.y, 40, 340));
+  }
+
+  protected suspendRouteTracking(): boolean {
+    return false;
+  }
+
+  protected repeatTaskText(): string {
+    return `当前任务：${OBJECTIVES[this.objectiveId].label}`;
+  }
+
+  protected onTap(_time: number): void {}
+
+  protected onSweep(_time: number): void {}
+
+  protected onHint(_time: number): void {}
+
   private updateMovement(time: number, delta: number): void {
-    let x = Number(this.keys.right.isDown) - Number(this.keys.left.isDown);
-    let y = Number(this.keys.down.isDown) - Number(this.keys.up.isDown);
-    if (!x && !y) return;
-    const length = Math.hypot(x, y) || 1;
-    x /= length;
-    y /= length;
+    const input = this.getMovementInput();
+    if (!input.lengthSq()) return;
+    input.normalize();
+    let x = input.x;
+    let y = input.y;
     const speed = this.revealMode === "sweep" ? 48 : 68;
-    this.player.x = Phaser.Math.Clamp(this.player.x + x * speed * (delta / 1000), 24, 616);
-    this.player.y = Phaser.Math.Clamp(this.player.y + y * speed * (delta / 1000), 40, 340);
+    const current = new Phaser.Math.Vector2(this.player.x, this.player.y);
+    const next = this.constrainMovement(current, new Phaser.Math.Vector2(
+      this.player.x + x * speed * (delta / 1000),
+      this.player.y + y * speed * (delta / 1000),
+    ));
+    this.player.setPosition(next.x, next.y);
     if (Math.abs(x) > Math.abs(y)) this.facing = x > 0 ? "right" : "left";
     else this.facing = y > 0 ? "down" : "up";
     this.player.setFrame(FACE_FRAME[this.facing]);
@@ -165,6 +218,7 @@ abstract class WalkScene extends Phaser.Scene {
       this.revealMode = "tap";
       this.revealUntil = time + REVEAL_PROFILE.tapDurationMs;
       audioDirector.caneTap(this.distanceToRoute() < 22 ? "tactile" : "stone");
+      this.onTap(time);
       this.player.setAngle(this.facing === "left" ? -4 : 4);
       this.time.delayedCall(140, () => this.player.setAngle(0));
     }
@@ -172,16 +226,18 @@ abstract class WalkScene extends Phaser.Scene {
       this.revealMode = "sweep";
       this.revealUntil = time + REVEAL_PROFILE.sweepDurationMs;
       audioDirector.sweep();
+      this.onSweep(time);
     }
     if (Phaser.Input.Keyboard.JustDown(this.keys.hint) && time >= this.hintCooldownUntil) {
       this.revealMode = "hint";
       this.revealUntil = time + REVEAL_PROFILE.hintDurationMs;
       this.hintCooldownUntil = time + REVEAL_PROFILE.hintCooldownMs;
       audioDirector.hint();
-      this.announce(`当前任务：${OBJECTIVES[this.objectiveId].label}`);
+      this.onHint(time);
+      this.announce(this.repeatTaskText());
     }
     if (Phaser.Input.Keyboard.JustDown(this.keys.repeat)) {
-      const text = `当前任务：${OBJECTIVES[this.objectiveId].label}`;
+      const text = this.repeatTaskText();
       this.announce(text);
       if ("speechSynthesis" in window) {
         window.speechSynthesis.cancel();
@@ -234,6 +290,7 @@ abstract class WalkScene extends Phaser.Scene {
     for (let index = 0; index < nodes.length - 1; index += 1) {
       const a = nodes[index];
       const b = nodes[index + 1];
+      if (b.breakBefore) continue;
       const vector = new Phaser.Math.Vector2(b.x - a.x, b.y - a.y).normalize();
       const perpendicular = new Phaser.Math.Vector2(-vector.y, vector.x);
       const distance = Phaser.Math.Distance.Between(a.x, a.y, b.x, b.y);
@@ -266,12 +323,14 @@ abstract class WalkScene extends Phaser.Scene {
     const point = new Phaser.Math.Vector2(this.player.x, this.player.y);
     let distance = Number.POSITIVE_INFINITY;
     for (let index = 0; index < this.path.nodes.length - 1; index += 1) {
+      if (this.path.nodes[index + 1].breakBefore) continue;
       distance = Math.min(distance, pointSegmentDistance(point, this.path.nodes[index], this.path.nodes[index + 1]));
     }
     return distance;
   }
 
-  private checkRoute(time: number): void {
+  protected checkRoute(time: number): void {
+    if (!this.trackDetours || this.suspendRouteTracking()) return;
     const onRoute = this.distanceToRoute() < 66;
     if (!onRoute && this.wasOnRoute && time - this.lastDetourAt > 3500) {
       this.lastDetourAt = time;
@@ -445,6 +504,11 @@ export class OldCityScene extends WalkScene {
   protected backgroundUrl = oldCityUrl;
   protected spawn = new Phaser.Math.Vector2(326, 320);
   protected objectiveId = "follow-old-city-path";
+  private railHeld = false;
+  private railRevealedUntil = 0;
+  private railBase!: Phaser.GameObjects.Graphics;
+  private railReveal!: Phaser.GameObjects.Graphics;
+  private leaving = false;
 
   constructor() {
     super("old-city");
@@ -452,23 +516,221 @@ export class OldCityScene extends WalkScene {
 
   protected onSceneReady(): void {
     if (getSnapshot().busState === "arrived") patchSnapshot({ busState: transitionBus("arrived", "alight") });
-    this.announce("你在白鸽巢下车。雨后的石路很亮，盲道从脚下延向旧城。");
+    this.railBase = this.add.graphics().setDepth(12);
+    this.railReveal = this.add.graphics().setDepth(15);
+    this.drawRail(this.railBase, 0x0b1115, 0.92);
+    this.announce("你在白鸽巢下车。沿盲道进入旧城；窄巷前需要改用扶手定位。");
   }
 
-  protected updateInteraction(): void {
+  protected getMovementInput(): Phaser.Math.Vector2 {
+    if (!this.railHeld) return super.getMovementInput();
+    const amount = Number(this.keys.up.isDown) - Number(this.keys.down.isDown);
+    if (!amount) return new Phaser.Math.Vector2();
+    const direction = new Phaser.Math.Vector2(
+      OLD_CITY_HANDRAIL.end.x - OLD_CITY_HANDRAIL.start.x,
+      OLD_CITY_HANDRAIL.end.y - OLD_CITY_HANDRAIL.start.y,
+    ).normalize();
+    return direction.scale(amount);
+  }
+
+  protected constrainMovement(current: Phaser.Math.Vector2, next: Phaser.Math.Vector2): Phaser.Math.Vector2 {
+    const bounded = super.constrainMovement(current, next);
+    if (!this.railHeld) return bounded;
+    return projectToSegment(bounded, OLD_CITY_HANDRAIL.start, OLD_CITY_HANDRAIL.end).point;
+  }
+
+  protected suspendRouteTracking(): boolean {
+    const distance = projectToSegment(new Phaser.Math.Vector2(this.player.x, this.player.y), OLD_CITY_HANDRAIL.start, OLD_CITY_HANDRAIL.end).distance;
+    return this.railHeld || distance < 46;
+  }
+
+  protected repeatTaskText(): string {
+    if (this.railHeld) return "当前任务：按 W 沿扶手前进，按 S 后退，按 E 可以松开。";
+    if (this.objectiveId === "follow-handrail") return "当前任务：横扫寻找右侧扶手，靠近后按 E 握住。";
+    return "当前任务：沿盲道前进；到点阵后停下，右侧约两步有连续扶手。";
+  }
+
+  protected onSweep(time: number): void {
+    this.revealRail(time);
+  }
+
+  protected onHint(time: number): void {
+    this.revealRail(time);
+  }
+
+  protected updateInteraction(time: number): void {
+    this.railReveal.clear();
+    if (time < this.railRevealedUntil || this.railHeld) this.drawRail(this.railReveal, OLD_CITY_HANDRAIL.revealColor, 1);
+
     const memory = { x: 445, y: 266 };
-    const exit = OBJECTIVES[this.objectiveId].target;
     const nearMemory = this.isNear(memory.x, memory.y, 30) && !getSnapshot().memories.includes("old-city-bell");
-    const nearExit = this.isNear(exit.x, exit.y, 34);
-    this.prompt = nearMemory ? "E  聆听记忆回声" : nearExit ? "E  走上大三巴前地" : "";
+    const railProjection = projectToSegment(new Phaser.Math.Vector2(this.player.x, this.player.y), OLD_CITY_HANDRAIL.start, OLD_CITY_HANDRAIL.end);
+    const nearRail = railProjection.distance <= OLD_CITY_HANDRAIL.engageRadius;
+    const railVisible = import.meta.env.DEV || time < this.railRevealedUntil || this.railHeld;
+
+    this.prompt = nearMemory
+      ? "E  聆听记忆回声"
+      : this.railHeld
+        ? "E  松开扶手"
+        : nearRail
+          ? railVisible ? "E  握住扶手" : "Shift  横扫寻找扶手"
+          : "";
+
     if (nearMemory && this.interactionPressed()) {
       collectMemory("old-city-bell");
       audioDirector.interact();
       this.announce("记忆回声：钟声穿过窄巷，林伯笑说，会走错路也算澳门的一部分。");
-    } else if (nearExit && this.interactionPressed()) {
+      return;
+    }
+
+    if (this.railHeld && this.interactionPressed()) {
+      this.railHeld = false;
       audioDirector.interact();
+      this.announce("你松开扶手。需要时可以再次横扫并握住。");
+      return;
+    }
+
+    if (!this.railHeld && nearRail && railVisible && this.interactionPressed()) {
+      this.railHeld = true;
+      this.objectiveId = "follow-handrail";
+      this.player.setPosition(railProjection.point.x, railProjection.point.y);
+      patchSnapshot({ objectiveId: "follow-handrail" });
+      audioDirector.interact();
+      this.announce("你握住右侧扶手。按 W 前进，按 S 后退，按 E 松开。");
+      return;
+    }
+
+    if (this.railHeld && railProjection.t >= 0.97 && !this.leaving) {
+      this.leaving = true;
+      this.railHeld = false;
+      this.player.setPosition(OLD_CITY_HANDRAIL.end.x, OLD_CITY_HANDRAIL.end.y);
+      patchSnapshot({ scene: "old-city-crossing", objectiveId: "request-crossing" });
+      this.announce("扶手在点阵砖旁结束。前方是斜向路口，请先到路缘请求通行。");
+      this.time.delayedCall(700, () => this.scene.start("old-city-crossing"));
+    }
+  }
+
+  private revealRail(time: number): void {
+    const projection = projectToSegment(new Phaser.Math.Vector2(this.player.x, this.player.y), OLD_CITY_HANDRAIL.start, OLD_CITY_HANDRAIL.end);
+    if (projection.distance > 150) return;
+    this.railRevealedUntil = time + 4500;
+    audioDirector.caneTap("metal");
+  }
+
+  private drawRail(graphics: Phaser.GameObjects.Graphics, color: number, alpha: number): void {
+    const { start, end } = OLD_CITY_HANDRAIL;
+    graphics.lineStyle(5, color, alpha);
+    graphics.lineBetween(start.x, start.y, end.x, end.y);
+    graphics.fillStyle(color, alpha);
+    [0, 0.5, 1].forEach((t) => {
+      const x = Phaser.Math.Linear(start.x, end.x, t);
+      const y = Phaser.Math.Linear(start.y, end.y, t);
+      graphics.fillRect(x - 2, y - 2, 4, 11);
+    });
+  }
+}
+
+export class OldCityCrossingScene extends WalkScene {
+  protected sceneId = "old-city-crossing" as const;
+  protected backgroundKey = "old-city-crossing-bg";
+  protected backgroundUrl = crossingUrl;
+  protected spawn = new Phaser.Math.Vector2(180, 326);
+  protected objectiveId = "request-crossing";
+  protected trackDetours = false;
+  private crossingState: CrossingState = "approach";
+  private signalGraphics!: Phaser.GameObjects.Graphics;
+  private guideGraphics!: Phaser.GameObjects.Graphics;
+  private leaving = false;
+
+  constructor() {
+    super("old-city-crossing");
+  }
+
+  protected onSceneReady(): void {
+    this.signalGraphics = this.add.graphics().setDepth(17);
+    this.guideGraphics = this.add.graphics().setDepth(14);
+    this.drawSignal();
+    this.announce("前方是斜向路口。沿盲道到点阵处，按 E 请求通行。");
+  }
+
+  protected repeatTaskText(): string {
+    if (this.crossingState === "requested") return "当前任务：留在点阵砖旁等待；收到文字和双音提示后再前进。";
+    if (this.crossingState === "walk") return "当前任务：可以通行。斑马线从脚下斜向右前方，沿引导线走到对岸点阵。";
+    return "当前任务：向前到点阵砖，按 E 请求通行。斑马线斜向右前方。";
+  }
+
+  protected constrainMovement(current: Phaser.Math.Vector2, next: Phaser.Math.Vector2): Phaser.Math.Vector2 {
+    const bounded = super.constrainMovement(current, next);
+    const constrained = constrainCrossingPosition(this.crossingState, bounded, OLD_CITY_CROSSING);
+    return new Phaser.Math.Vector2(constrained.x, constrained.y);
+  }
+
+  protected updateInteraction(): void {
+    const request = OLD_CITY_CROSSING.requestPoint;
+    const nearRequest = this.isNear(request.x, request.y, 34);
+    this.drawCrossingGuide();
+
+    this.prompt = this.crossingState === "approach" && nearRequest
+      ? "E  请求通行"
+      : this.crossingState === "requested"
+        ? "请留在路缘等候"
+        : this.crossingState === "walk"
+          ? "沿斜向右前方通过"
+          : "";
+
+    if (this.crossingState === "approach" && nearRequest && this.interactionPressed()) {
+      this.crossingState = transitionCrossing(this.crossingState, "request");
+      this.objectiveId = "wait-crossing";
+      patchSnapshot({ objectiveId: "wait-crossing" });
+      audioDirector.crossingWait();
+      this.announce("通行请求已收到。请留在路缘等候文字和双音提示。");
+      this.drawSignal();
+      this.time.delayedCall(OLD_CITY_CROSSING.waitMs, () => {
+        if (this.crossingState !== "requested") return;
+        this.crossingState = transitionCrossing(this.crossingState, "allow");
+        this.objectiveId = "cross-junction";
+        patchSnapshot({ objectiveId: "cross-junction" });
+        audioDirector.crossingWalk();
+        this.announce("可以通行。斑马线从脚下斜向右前方，沿引导线走到对岸点阵。");
+        this.drawSignal();
+      });
+      return;
+    }
+
+    if (this.crossingState === "walk" && this.isNear(OLD_CITY_CROSSING.farCurb.x, OLD_CITY_CROSSING.farCurb.y, 30) && !this.leaving) {
+      this.leaving = true;
+      this.crossingState = transitionCrossing(this.crossingState, "finish");
       patchSnapshot({ scene: "ruins", objectiveId: "meet-lam" });
-      this.scene.start("ruins");
+      this.announce("你抵达对岸点阵。前方盲道通向大三巴牌坊。");
+      this.time.delayedCall(650, () => this.scene.start("ruins"));
+    }
+  }
+
+  private drawSignal(): void {
+    if (!this.signalGraphics) return;
+    this.signalGraphics.clear();
+    this.signalGraphics.lineStyle(4, 0x151c20, 1);
+    this.signalGraphics.lineBetween(235, 282, 235, 234);
+    this.signalGraphics.fillStyle(0x11171b, 1);
+    this.signalGraphics.fillRoundedRect(223, 220, 24, 34, 3);
+    const color = this.crossingState === "walk" || this.crossingState === "crossed" ? 0x73c98b : 0xc85d52;
+    this.signalGraphics.fillStyle(color, 1);
+    this.signalGraphics.fillCircle(235, 237, 6);
+  }
+
+  private drawCrossingGuide(): void {
+    this.guideGraphics.clear();
+    if (this.crossingState !== "walk") return;
+    const { requestPoint, farCurb } = OLD_CITY_CROSSING;
+    this.guideGraphics.lineStyle(3, 0xf6ca55, 0.82);
+    this.guideGraphics.lineBetween(requestPoint.x, requestPoint.y, farCurb.x, farCurb.y);
+    this.guideGraphics.fillStyle(0xffdc7a, 0.92);
+    for (let t = 0.15; t < 1; t += 0.17) {
+      this.guideGraphics.fillCircle(
+        Phaser.Math.Linear(requestPoint.x, farCurb.x, t),
+        Phaser.Math.Linear(requestPoint.y, farCurb.y, t),
+        2.5,
+      );
     }
   }
 }

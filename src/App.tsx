@@ -45,7 +45,6 @@ export function App() {
   const [ending, setEnding] = useState<EndingId | null>(null);
   const [saved, setSaved] = useState<GameSnapshotV2 | null>(() => loadSnapshot());
   const [showDevTools, setShowDevTools] = useState(import.meta.env.DEV);
-  const [currentScene, setCurrentScene] = useState<SceneId>(() => getSnapshot().scene);
   const mountRef = useRef<HTMLDivElement>(null);
   const endingCopy = useMemo(() => (ending ? ENDING_COPY[ending] : null), [ending]);
 
@@ -53,12 +52,10 @@ export function App() {
     const offHud = gameEvents.on("hud", setHud);
     const offPause = gameEvents.on("pause", (value) => setPaused(value));
     const offEnding = gameEvents.on("ending", (value) => setEnding(value));
-    const offScene = gameEvents.on("scene", setCurrentScene);
     return () => {
       offHud();
       offPause();
       offEnding();
-      offScene();
       destroyGame();
     };
   }, []);
@@ -120,21 +117,26 @@ export function App() {
 
   const jumpDev = (scene: SceneId, busState: BusTransitState) => {
     sessionStorage.setItem("sound-road-dev-reveal", "sweep");
-    patchSnapshot({ scene, busState, objectiveId: scene === "bus-stop" ? "board-17" : scene === "bus-interior" ? "find-seat" : scene === "bus-ride" ? "ride-to-camoes" : scene === "old-city" ? "follow-old-city-path" : "meet-lam" });
+    patchSnapshot({ scene, busState, objectiveId: scene === "bus-stop" ? "board-17" : scene === "bus-interior" ? "find-seat" : scene === "bus-ride" ? "ride-to-camoes" : scene === "old-city" ? "follow-old-city-path" : scene === "old-city-crossing" ? "request-crossing" : "meet-lam" });
     startGame("phaser-game", scene);
   };
 
   const teleportDev = (x: number, y: number) => gameEvents.emit("devTeleport", { x, y });
   const teleportToCurrentTarget = () => {
-    const targetByScene: Record<SceneId, { x: number; y: number }> = {
-      "bus-stop": { x: 532, y: 188 },
-      "bus-interior": { x: 350, y: 164 },
-      "bus-ride": { x: 320, y: 180 },
-      "old-city": { x: 236, y: 112 },
-      ruins: { x: 240, y: 88 },
+    const targetByObjective: Record<string, { x: number; y: number }> = {
+      "board-17": { x: 532, y: 188 },
+      "find-seat": { x: 350, y: 164 },
+      "ride-to-camoes": { x: 320, y: 180 },
+      "follow-old-city-path": { x: 318, y: 138 },
+      "follow-handrail": { x: 246, y: 100 },
+      "request-crossing": { x: 278, y: 288 },
+      "wait-crossing": { x: 278, y: 288 },
+      "cross-junction": { x: 430, y: 80 },
+      "meet-lam": { x: 240, y: 88 },
     };
-    const target = targetByScene[currentScene];
+    const target = targetByObjective[getSnapshot().objectiveId] ?? { x: 320, y: 180 };
     teleportDev(target.x, target.y);
+    gameEvents.emit("devReveal", "sweep");
   };
 
   return (
@@ -208,6 +210,7 @@ export function App() {
               <button onClick={() => gameEvents.emit("devInteract", undefined)}>执行E</button>
               <button onClick={() => jumpDev("bus-ride", "seated")}>过场</button>
               <button onClick={() => jumpDev("old-city", "arrived")}>旧城</button>
+              <button onClick={() => jumpDev("old-city-crossing", "alighted")}>路口</button>
               <button onClick={() => jumpDev("ruins", "alighted")}>终点</button>
               <button onClick={() => setShowDevTools(false)}>隐藏测试栏</button>
             </div>

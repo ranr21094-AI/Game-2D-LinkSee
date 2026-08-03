@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { PATHS, REVEAL_PROFILE } from "./content";
+import { OLD_CITY_CROSSING, OLD_CITY_HANDRAIL, PATHS, REVEAL_PROFILE } from "./content";
 
 describe("tactile path definitions", () => {
-  it("keeps every playable scene on one continuous path", () => {
+  it("keeps path coordinates valid and marks only intentional breaks", () => {
     Object.values(PATHS).forEach((path) => {
       expect(path.nodes.length).toBeGreaterThanOrEqual(4);
       path.nodes.forEach((node) => {
@@ -10,6 +10,9 @@ describe("tactile path definitions", () => {
         expect(Number.isFinite(node.y)).toBe(true);
       });
     });
+    expect(PATHS["old-city"].nodes.filter((node) => node.breakBefore)).toHaveLength(1);
+    expect(PATHS["old-city-crossing"].nodes.filter((node) => node.breakBefore)).toHaveLength(1);
+    expect(Object.entries(PATHS).filter(([scene]) => !["old-city", "old-city-crossing"].includes(scene)).every(([, path]) => path.nodes.every((node) => !node.breakBefore))).toBe(true);
   });
 
   it("places decision tiles at boarding, seat and destination tasks", () => {
@@ -17,6 +20,19 @@ describe("tactile path definitions", () => {
     expect(decisions.some((node) => node.taskId === "board-17")).toBe(true);
     expect(decisions.some((node) => node.taskId === "find-seat")).toBe(true);
     expect(decisions.some((node) => node.taskId === "meet-lam")).toBe(true);
+  });
+
+  it("bridges the old-city tactile-path gap with the guide rail", () => {
+    const oldCity = PATHS["old-city"].nodes;
+    const railEnd = oldCity.find((node) => node.taskId === "follow-handrail");
+    expect(OLD_CITY_HANDRAIL.start).toEqual({ x: 318, y: 138 });
+    expect(railEnd).toMatchObject({ ...OLD_CITY_HANDRAIL.end, breakBefore: true });
+  });
+
+  it("keeps tactile paving on the two curbs instead of across the roadway", () => {
+    const crossing = PATHS["old-city-crossing"].nodes;
+    expect(crossing.find((node) => node.taskId === "request-crossing")).toMatchObject(OLD_CITY_CROSSING.requestPoint);
+    expect(crossing.find((node) => node.taskId === "cross-junction")).toMatchObject({ ...OLD_CITY_CROSSING.farCurb, breakBefore: true });
   });
 
   it("uses the requested reveal ranges and durations", () => {

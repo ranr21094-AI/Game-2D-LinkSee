@@ -22,9 +22,10 @@ class AudioDirector {
     oscillator.stop(now + duration);
   }
 
-  caneTap(kind: "tactile" | "stone" = "tactile"): void {
+  caneTap(kind: "tactile" | "stone" | "metal" = "tactile"): void {
     this.unlock();
-    this.tone(kind === "tactile" ? 680 : 330, 0.08, 0.08, "square");
+    const frequency = kind === "tactile" ? 680 : kind === "metal" ? 940 : 330;
+    this.tone(frequency, kind === "metal" ? 0.14 : 0.08, 0.08, kind === "metal" ? "triangle" : "square");
   }
 
   sweep(): void {
@@ -45,6 +46,17 @@ class AudioDirector {
   interact(): void {
     this.unlock();
     this.tone(520, 0.1, 0.05, "sine");
+  }
+
+  crossingWait(): void {
+    this.unlock();
+    this.tone(260, 0.22, 0.055, "sine");
+  }
+
+  crossingWalk(): void {
+    this.unlock();
+    this.tone(760, 0.12, 0.06, "sine");
+    window.setTimeout(() => this.tone(920, 0.16, 0.05, "sine"), 150);
   }
 }
 

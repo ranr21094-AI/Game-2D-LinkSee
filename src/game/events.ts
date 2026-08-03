@@ -8,6 +8,7 @@ type EventMap = {
   announce: string;
   devTeleport: TilePoint;
   devInteract: undefined;
+  devReveal: "sweep" | "hint";
 };
 
 type Handler<T> = (payload: T) => void;

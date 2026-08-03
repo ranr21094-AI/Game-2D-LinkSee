@@ -1,4 +1,4 @@
-export type SceneId = "bus-stop" | "bus-interior" | "bus-ride" | "old-city" | "ruins";
+export type SceneId = "bus-stop" | "bus-interior" | "bus-ride" | "old-city" | "old-city-crossing" | "ruins";
 
 export type TilePoint = { x: number; y: number };
 
@@ -7,11 +7,32 @@ export type TactileTileKind = "guidance" | "decision";
 export type TactilePathNode = TilePoint & {
   kind: TactileTileKind;
   taskId?: string;
+  breakBefore?: boolean;
 };
 
 export type TactilePathDefinition = {
   scene: SceneId;
   nodes: TactilePathNode[];
+};
+
+export type GuideRailDefinition = {
+  id: string;
+  scene: SceneId;
+  start: TilePoint;
+  end: TilePoint;
+  engageRadius: number;
+  revealColor: number;
+};
+
+export type CrossingState = "approach" | "requested" | "walk" | "crossed";
+
+export type CrossingDefinition = {
+  scene: SceneId;
+  requestPoint: TilePoint;
+  farCurb: TilePoint;
+  nearSideBoundary: { maxX: number; minY: number };
+  corridorWidth: number;
+  waitMs: number;
 };
 
 export type ObjectiveStep2D = {
