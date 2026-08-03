@@ -1,0 +1,88 @@
+export type SceneId = "bus-stop" | "bus-interior" | "bus-ride" | "old-city" | "ruins";
+
+export type TilePoint = { x: number; y: number };
+
+export type TactileTileKind = "guidance" | "decision";
+
+export type TactilePathNode = TilePoint & {
+  kind: TactileTileKind;
+  taskId?: string;
+};
+
+export type TactilePathDefinition = {
+  scene: SceneId;
+  nodes: TactilePathNode[];
+};
+
+export type ObjectiveStep2D = {
+  id: string;
+  scene: SceneId;
+  label: string;
+  target: TilePoint;
+  triggerRadius: number;
+  interaction: "approach" | "interact";
+  checkpoint?: boolean;
+};
+
+export type RevealProfile = {
+  tapForwardTiles: number;
+  tapBackTiles: number;
+  tapDurationMs: number;
+  sweepTiles: number;
+  sweepDurationMs: number;
+  hintTiles: number;
+  hintDurationMs: number;
+  hintCooldownMs: number;
+  color: number;
+};
+
+export type BusTransitState =
+  | "waiting"
+  | "doorOpen"
+  | "boarding"
+  | "seated"
+  | "riding"
+  | "arrived"
+  | "alighted";
+
+export type MemoryId = "bus-rain" | "old-city-bell" | "border-hand";
+export type EndingId = "reunion" | "detour" | "return";
+
+export type GameSettings = {
+  masterVolume: number;
+  effectsVolume: number;
+  dialogueVolume: number;
+  subtitleScale: number;
+  reducedMotion: boolean;
+};
+
+export type GameSnapshotV2 = {
+  version: 1;
+  objectiveId: string;
+  scene: SceneId;
+  busState: BusTransitState;
+  selectedSeatId: string | null;
+  memories: MemoryId[];
+  detourScore: number;
+  startedAt: number;
+  elapsedBeforeResume: number;
+  returnRequested: boolean;
+  ending: EndingId | null;
+  settings: GameSettings;
+};
+
+export type EndingMetrics = {
+  elapsedSeconds: number;
+  detourScore: number;
+  returnRequested: boolean;
+};
+
+export type HudState = {
+  objective: string;
+  subtitle: string;
+  prompt: string;
+  memories: number;
+  detours: number;
+  sceneLabel: string;
+  hintCooling: boolean;
+};
