@@ -2,6 +2,9 @@ import Phaser from "phaser";
 import architectureBaseUrl from "../assets/macau-architecture-base.png";
 import architectureMemoryUrl from "../assets/macau-architecture-memory.png";
 import architectureWarmUrl from "../assets/macau-architecture-warm.png";
+import ruinsFacadeBaseUrl from "../assets/ruins-facade-base.png";
+import ruinsFacadeMemoryUrl from "../assets/ruins-facade-memory.png";
+import ruinsFacadeWarmUrl from "../assets/ruins-facade-warm.png";
 import { TREE_TEXTURE, type GroundVisualState } from "./ground-tiles";
 import type { DecorationKind, MapDecoration } from "./tilemap";
 
@@ -9,6 +12,12 @@ export const ARCHITECTURE_TEXTURE: Record<GroundVisualState, string> = {
   base: "architecture-base",
   memory: "architecture-memory",
   warm: "architecture-warm",
+};
+
+export const RUINS_FACADE_TEXTURE: Record<GroundVisualState, string> = {
+  base: "ruins-facade-base",
+  memory: "ruins-facade-memory",
+  warm: "ruins-facade-warm",
 };
 
 type Crop = { x: number; y: number; width: number; height: number };
@@ -20,14 +29,8 @@ const ARCHITECTURE_CROPS: Partial<Record<DecorationKind, Crop>> = {
   "stone-gate": { x: 495, y: 280, width: 305, height: 180 },
 };
 
-const PROGRAMMATIC_KINDS = ["gate-building", "shelter", "bus", "bench", "lamp", "signal", "bus-window", "bus-pole", "ruins-facade"] as const;
+const PROGRAMMATIC_KINDS = ["gate-building", "shelter", "bus", "bench", "lamp", "signal", "bus-window", "bus-pole"] as const;
 type ProgrammaticKind = (typeof PROGRAMMATIC_KINDS)[number];
-
-const PROGRAMMATIC_SIZE: Record<ProgrammaticKind, { width: number; height: number }> = {
-  "gate-building": { width: 320, height: 96 }, shelter: { width: 260, height: 86 }, bus: { width: 208, height: 72 }, bench: { width: 72, height: 28 },
-  lamp: { width: 22, height: 86 }, signal: { width: 22, height: 70 }, "bus-window": { width: 320, height: 64 }, "bus-pole": { width: 12, height: 174 },
-  "ruins-facade": { width: 286, height: 100 },
-};
 
 type Palette = { stone: string; dark: string; light: string; metal: string; glow: string; red: string };
 const PALETTES: Record<GroundVisualState, Palette> = {
@@ -70,12 +73,6 @@ function drawProgrammatic(ctx: CanvasRenderingContext2D, kind: DecorationKind, w
     rect(ctx, p.metal, 0, height - 13, width, 5);
   } else if (kind === "bus-pole") {
     rect(ctx, p.dark, 3, 0, 6, height); rect(ctx, p.light, 4, 0, 2, height); rect(ctx, p.dark, 0, 8, 12, 5); rect(ctx, p.dark, 0, height - 13, 12, 5);
-  } else if (kind === "ruins-facade") {
-    rect(ctx, p.dark, 0, 16, width, height - 16); rect(ctx, p.stone, 5, 19, width - 10, height - 23); rect(ctx, p.light, 0, 13, width, 6);
-    rect(ctx, p.stone, 34, 4, width - 68, 20); rect(ctx, p.light, 68, 0, width - 136, 7);
-    const openings = [48, width / 2 - 18, width - 82];
-    openings.forEach((x, index) => { rect(ctx, p.dark, x, index === 1 ? 36 : 46, index === 1 ? 36 : 28, index === 1 ? 58 : 38); rect(ctx, p.glow, x + 5, index === 1 ? 43 : 52, index === 1 ? 26 : 18, 9); });
-    for (let x = 12; x < width; x += 28) rect(ctx, p.dark, x, 28, 2, height - 32);
   }
 }
 
@@ -83,21 +80,36 @@ export function preloadEnvironmentAssets(scene: Phaser.Scene): void {
   if (!scene.textures.exists(ARCHITECTURE_TEXTURE.base)) scene.load.image(ARCHITECTURE_TEXTURE.base, architectureBaseUrl);
   if (!scene.textures.exists(ARCHITECTURE_TEXTURE.memory)) scene.load.image(ARCHITECTURE_TEXTURE.memory, architectureMemoryUrl);
   if (!scene.textures.exists(ARCHITECTURE_TEXTURE.warm)) scene.load.image(ARCHITECTURE_TEXTURE.warm, architectureWarmUrl);
-}
-
-export function ensureEnvironmentTextures(scene: Phaser.Scene): void {
-  PROGRAMMATIC_KINDS.forEach((kind) => STATES.forEach((state) => {
-    const key = `environment-${kind}-${state}`;
-    if (scene.textures.exists(key)) return;
-    const size = PROGRAMMATIC_SIZE[kind];
-    const texture = scene.textures.createCanvas(key, size.width, size.height);
-    if (!texture) return;
-    drawProgrammatic(texture.getContext(), kind, size.width, size.height, state);
-    texture.refresh();
-  }));
+  if (!scene.textures.exists(RUINS_FACADE_TEXTURE.base)) scene.load.image(RUINS_FACADE_TEXTURE.base, ruinsFacadeBaseUrl);
+  if (!scene.textures.exists(RUINS_FACADE_TEXTURE.memory)) scene.load.image(RUINS_FACADE_TEXTURE.memory, ruinsFacadeMemoryUrl);
+  if (!scene.textures.exists(RUINS_FACADE_TEXTURE.warm)) scene.load.image(RUINS_FACADE_TEXTURE.warm, ruinsFacadeWarmUrl);
 }
 
 const STATES: GroundVisualState[] = ["base", "memory", "warm"];
+
+/** Contain-fit a source rect inside a max box, preserving aspect ratio. */
+function fitSize(sourceWidth: number, sourceHeight: number, maxWidth: number, maxHeight: number): { width: number; height: number } {
+  const scale = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight);
+  return {
+    width: Math.max(1, Math.round(sourceWidth * scale)),
+    height: Math.max(1, Math.round(sourceHeight * scale)),
+  };
+}
+
+/** Programmatic sprites are drawn at their exact display size so nothing is stretched. */
+function ensureProgrammaticTextures(scene: Phaser.Scene, kind: ProgrammaticKind, width: number, height: number): Record<GroundVisualState, string> {
+  const textures = {} as Record<GroundVisualState, string>;
+  STATES.forEach((state) => {
+    const key = `environment-${kind}-${state}-${width}x${height}`;
+    textures[state] = key;
+    if (scene.textures.exists(key)) return;
+    const texture = scene.textures.createCanvas(key, width, height);
+    if (!texture) return;
+    drawProgrammatic(texture.getContext(), kind, width, height, state);
+    texture.refresh();
+  });
+  return textures;
+}
 
 export type EnvironmentSprite = {
   sprite: Phaser.GameObjects.Image;
@@ -126,17 +138,30 @@ export function renderMapDecoration(scene: Phaser.Scene, decoration: MapDecorati
     if (decoration.flipX) sprite.setFlipX(true);
     return { sprite, textures: TREE_TEXTURE, x: decoration.x, y: decoration.y - decoration.height / 2 };
   }
+  if (decoration.kind === "ruins-facade") {
+    const source = scene.textures.get(RUINS_FACADE_TEXTURE.base).getSourceImage();
+    const fit = fitSize(source.width, source.height, decoration.width, decoration.height);
+    const sprite = scene.add.image(decoration.x, decoration.y, RUINS_FACADE_TEXTURE.base).setOrigin(0.5, 1).setDisplaySize(fit.width, fit.height).setDepth(decoration.y);
+    if (decoration.flipX) sprite.setFlipX(true);
+    return { sprite, textures: RUINS_FACADE_TEXTURE, x: decoration.x, y: decoration.y - fit.height / 2 };
+  }
   const frames = ensureArchitectureFrames(scene, decoration.kind);
   if (frames) {
-    const sprite = scene.add.image(decoration.x, decoration.y, ARCHITECTURE_TEXTURE.base, frames.base).setOrigin(0.5, 1).setDisplaySize(decoration.width, decoration.height).setDepth(decoration.y);
+    const crop = ARCHITECTURE_CROPS[decoration.kind];
+    const fit = crop
+      ? fitSize(crop.width, crop.height, decoration.width, decoration.height)
+      : { width: decoration.width, height: decoration.height };
+    const sprite = scene.add.image(decoration.x, decoration.y, ARCHITECTURE_TEXTURE.base, frames.base).setOrigin(0.5, 1).setDisplaySize(fit.width, fit.height).setDepth(decoration.y);
     if (decoration.flipX) sprite.setFlipX(true);
-    return { sprite, textures: ARCHITECTURE_TEXTURE, frames, x: decoration.x, y: decoration.y - decoration.height / 2 };
+    return { sprite, textures: ARCHITECTURE_TEXTURE, frames, x: decoration.x, y: decoration.y - fit.height / 2 };
   }
   if (!(PROGRAMMATIC_KINDS as readonly DecorationKind[]).includes(decoration.kind)) return null;
-  const textures = Object.fromEntries(STATES.map((state) => [state, `environment-${decoration.kind}-${state}`])) as Record<GroundVisualState, string>;
-  const sprite = scene.add.image(decoration.x, decoration.y, textures.base).setOrigin(0.5, 1).setDisplaySize(decoration.width, decoration.height).setDepth(decoration.y);
+  const width = Math.max(1, Math.round(decoration.width));
+  const height = Math.max(1, Math.round(decoration.height));
+  const textures = ensureProgrammaticTextures(scene, decoration.kind as ProgrammaticKind, width, height);
+  const sprite = scene.add.image(decoration.x, decoration.y, textures.base).setOrigin(0.5, 1).setDisplaySize(width, height).setDepth(decoration.y);
   if (decoration.flipX) sprite.setFlipX(true);
-  return { sprite, textures, x: decoration.x, y: decoration.y - decoration.height / 2 };
+  return { sprite, textures, x: decoration.x, y: decoration.y - height / 2 };
 }
 
 export function ensureCaneTextures(scene: Phaser.Scene): void {

@@ -1,10 +1,42 @@
 # Design QA
 
-## Evidence
+## 2026-08-05 重做修复批次验收（当前有效版本）
+
+- Browser URL: `http://localhost:5173/`（DEV 跳转栏可分段进入候车/车厢/过场/旧城/路口/终点）
+- 静态验证：`tsc -b` 通过；`vitest run src` 48 个测试全部通过（含 colorMemory 容量新增用例）
+- 本批修复回归清单：
+  1. 站牌确认后场景内 `objectiveId` 同步为 `board-17`，车门 (488,284) 交互与 HUD/Q/H 指向恢复正常。
+  2. 巴士过场跳过（>3 秒按 E）时补发 `bus-rain` 记忆，跳过不再惩罚终章层级与结局指标。
+  3. 建筑图集五模块按裁切宽高比 contain-fit 显示，骑楼恢复竖向比例，无非等比压扁。
+  4. 程序化装饰（关闸/候车亭/巴士/车窗等）按实际显示尺寸原生重绘，消除拉伸。
+  5. 触觉砖调色板重构 + 四边描边，在 plaza 灰（≈126）地面上轮廓清晰可读。
+  6. 暖色恢复 2 秒后改为 750ms 叠层渐变淡出至 35% 淡彩记忆，不再整砖/整楼硬切。
+  7. 主角接入四向 × 三帧走路动画（7fps），身高 100px → 56px 原生 1:1，脚部锚点；NPC 58px。
+  8. 林伯独立三姿态精灵（站立/挥手/举相机），终章播放挥手→举相机动画。
+  9. 大三巴牌坊换用手绘模块（base/memory/warm 三态与地砖同权重派生），程序化矩形版退役。
+  10. `colorMemory` 增加 240 条硬上限（丢弃最旧）、去重距离 32px、每帧场景记忆引用缓存。
+  11. 扶手段方向键 ↑/↓ 与 W/S 等效，恢复双键位约定。
+
+### 端到端手动验收清单
+
+| 段落 | 验收点 |
+| --- | --- |
+| 主菜单/教学 | 标题、继续按钮状态；教学页四纹/点阵示例与键位表正确 |
+| 關閘候车 | 站牌凸字 17 与诱饵 25 可分别敲出；确认 17 后 HUD 切换为车门任务；车门开启后到 (488,284) 出现「E 上车」；误入车行道触发车流警告并退回人行道 |
+| 车厢 | 杖击座位边缘后才可 E 入座；四纹盲道与点阵砖常显 |
+| 过场 | 3 秒后可 E 跳过；跳过与不跳过均获得 `bus-rain` 记忆；报站字幕按时刻出现 |
+| 白鸽巢 | 三帧步态正常、朝向正确；支路围栏敲出障碍文案并收录 `old-city-bell`；金属扶手敲出后可 E 握住，W/S/↑/↓ 移动，走到底切换路口 |
+| 路口 | E 请求通行 → 等待 → 双音提示后可通行；走廊约束正交；对岸点阵右转离开 |
+| 大三巴 | 手绘牌坊三态正常；暖色 2 秒保持 + 750ms 淡出；E 回应林伯触发暖色波与挥手/举相机动画；结局按记忆数分层文案 |
+| 结局/暂停 | 三种结局可达；暂停计时停止；设置项即时生效；刷新后继续游戏恢复检查点与淡彩记忆 |
+
+final result: pending browser E2E walkthrough（静态验证全部通过）
+
+## Legacy evidence（已废弃深靛蓝概念，存档于 `docs/q-align/legacy-qa/`）
 
 - Source visual truth: `C:\Users\10127\.codex\generated_images\019fbb02-4d10-7761-8593-5ff0b86f3527\exec-b1a19eb4-8278-4fd7-96ad-d2411b80c109.png`
-- Browser implementation capture: `C:\Users\10127\OneDrive\文档\LinkSee\web-game-2d\qa-game-old-city-final.png`
-- Side-by-side comparison: `C:\Users\10127\OneDrive\文档\LinkSee\web-game-2d\qa-comparison.png`
+- Browser implementation capture: `docs/q-align/legacy-qa/qa-game-old-city-final.png`
+- Side-by-side comparison: `docs/q-align/legacy-qa/qa-comparison.png`
 - Browser URL: `http://127.0.0.1:4173/`
 - Viewport: 1280 × 720 CSS pixels, device scale factor 1
 - Source pixels: 1672 × 941; normalized to 1280 × 720 with nearest-neighbor resampling for comparison

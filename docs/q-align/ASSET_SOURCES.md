@@ -10,7 +10,13 @@
 | `src/assets/macau-architecture-memory.png` | 触碰后的低饱和记忆状态 | 同一源图保留约 22% 色彩 |
 | `src/assets/macau-architecture-warm.png` | 触碰和终章的完整暖色状态 | ImageGen 内置模式生成；`remove_chroma_key.py` 去除统一绿色背景 |
 | `docs/q-align/macau-architecture-source.png` | 生成记录与复核源图 | 骑楼正面、转角屋、柱廊、两层住宅、低层住宅、石墙门共六个隔离模块 |
-| `src/assets/traveler-no-cane.png` | 无拐杖玩家四向精灵 | ImageGen 编辑；实时单杖由代码生成的四向像素精灵绘制 |
+| `src/assets/traveler-no-cane.png` | 角色参考源图（生产已不直接加载） | ImageGen 编辑；实时单杖由代码生成的四向像素精灵绘制 |
+| `src/assets/traveler-walk.png` | 玩家四向 × 三帧走路精灵表（64×64/帧） | 内置生图以上一行为参考生成 6×3 透明底原图；脚本按列取向后/侧向/正面三列，最大连通域去杂点，裁切后统一 56px 身高、脚底基线对齐，左向由右向镜像 |
+| `docs/q-align/traveler-walk-source.png` | 走路精灵生成记录与复核源图 | 6 列 × 3 行：两列背影、三列右侧向、一列正面；左下角含水印，生产仅取第 2/4/6 列 |
+| `src/assets/lam.png` | 林伯三姿态精灵（64×64/帧：站立、挥手、举相机） | 内置生图以走路精灵表为风格参考生成透明底横排原图；`scripts/process_lam_sprite.py` 按连通域检测三个人物、以站姿身高统一缩放、脚底基线对齐 |
+| `docs/q-align/lam-source.png` | 林伯生成记录与复核源图 | 白发、橄榄绿外套、颈挂胶片相机；非严格网格，生产按连通域切分 |
+| `src/assets/ruins-facade-{base,memory,warm}.png` | 大三巴牌坊终章模块三态（165×200） | 内置生图以建筑图集为风格参考生成透明底竖版原图；`scripts/process_ruins_facade.py` 取最大连通域去水印，base 按 0.24/0.68/0.08 亮度灰度化，memory 保留 34% 色彩（与地砖 TONES 一致） |
+| `docs/q-align/ruins-facade-source.png` | 牌坊生成记录与复核源图 | 五层立面、三角山花在位、中央拱窗暖光；程序化矩形版 `ruins-facade` 已退役 |
 | `src/assets/npc-spritesheet.png` | 两名问路 NPC | ImageGen 角色表，透明化后使用 |
 | `src/assets/chapter-map.png` | 章节过场路线图 | ImageGen 原图；当前节点和中文说明由 React 叠加 |
 

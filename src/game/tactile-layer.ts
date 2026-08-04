@@ -27,14 +27,16 @@ interface BrickPalette {
   ridgeDark: Rgb;
 }
 
-/** weathered warm-gray tactile brick, close to pavement stone so it reads as embedded */
+/** weathered warm-gray tactile brick, close to pavement stone so it reads as embedded.
+ *  Body sits clearly darker than the palest pavement (plaza ≈126 luma) so bricks stay
+ *  readable on every ground tone; ridges stay bright for the raised-stripe signal. */
 const NORMAL: BrickPalette = {
-  base: [125, 122, 108],
-  grout: [74, 71, 60],
-  seamLight: [150, 146, 128],
-  ridge: [168, 162, 138],
-  ridgeLight: [196, 190, 164],
-  ridgeDark: [88, 84, 68],
+  base: [104, 101, 88],
+  grout: [56, 53, 44],
+  seamLight: [132, 128, 110],
+  ridge: [178, 172, 148],
+  ridgeLight: [208, 202, 176],
+  ridgeDark: [70, 66, 52],
 };
 
 /** cane-contact enhanced brick, restored warm Macau-after-rain color */
@@ -91,6 +93,13 @@ function drawBrick(ctx: CanvasRenderingContext2D, palette: BrickPalette, kind: "
     ctx.fillRect(x0 + x, y0 + 1, 1, 1);
     ctx.fillStyle = jitter(rand, palette.grout, 4);
     ctx.fillRect(x0 + x, y0 + 14, 1, 1);
+  }
+  // side edges keep the brick silhouette readable on pale pavement
+  for (let y = 2; y < 14; y += 1) {
+    ctx.fillStyle = jitter(rand, palette.seamLight, 5);
+    ctx.fillRect(x0 + 1, y0 + y, 1, 1);
+    ctx.fillStyle = jitter(rand, palette.grout, 4);
+    ctx.fillRect(x0 + 14, y0 + y, 1, 1);
   }
   // worn corners
   const corners: Array<[number, number]> = [[1, 1], [2, 1], [1, 2], [14, 1], [13, 1], [14, 2], [1, 14], [2, 14], [1, 13], [14, 14], [13, 14], [14, 13]];

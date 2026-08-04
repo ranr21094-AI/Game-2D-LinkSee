@@ -66,10 +66,14 @@ export function determineEnding(metrics: EndingMetrics): EndingId {
   return "reunion";
 }
 
+export const COLOR_MEMORY_LIMIT = 240;
+
 export function mergeColorMemory(points: ColorMemoryPoint[], next: ColorMemoryPoint, minimumDistance = 18): ColorMemoryPoint[] {
   const existing = points.find((point) => point.scene === next.scene && Math.hypot(point.x - next.x, point.y - next.y) < minimumDistance);
   if (existing) return points;
-  return [...points, next];
+  const merged = [...points, next];
+  // Hard cap: drop the oldest discoveries first so per-frame cost and save size stay bounded.
+  return merged.length > COLOR_MEMORY_LIMIT ? merged.slice(merged.length - COLOR_MEMORY_LIMIT) : merged;
 }
 
 const CHECKPOINTS: Record<ResumeStage, Pick<GameSnapshotV3, "scene" | "objectiveId" | "resumeStage"> & { point: TilePoint }> = {

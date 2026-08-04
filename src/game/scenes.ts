@@ -1,11 +1,12 @@
 import Phaser from "phaser";
-import travelerUrl from "../assets/traveler-no-cane.png";
+import travelerWalkUrl from "../assets/traveler-walk.png";
+import lamUrl from "../assets/lam.png";
 import npcSpritesheetUrl from "../assets/npc-spritesheet.png";
 import { audioDirector } from "./audio";
 import { describePhonePosition, PHONE_COOLDOWN_MS } from "./assist";
 import { composeRepeatText, OBJECTIVES, OLD_CITY_CROSSING, OLD_CITY_HANDRAIL, PATHS, REVEAL_PROFILE, SCENE_LABELS, TACTILE_LIT_MS } from "./content";
 import { CROSSING_TILEMAP } from "./crossing-map";
-import { ensureCaneTextures, ensureEnvironmentTextures, preloadEnvironmentAssets, renderMapDecoration, type EnvironmentSprite } from "./environment-art";
+import { ensureCaneTextures, preloadEnvironmentAssets, renderMapDecoration, type EnvironmentSprite } from "./environment-art";
 import { gameEvents } from "./events";
 import { constrainCrossingPosition, determineEnding, mergeColorMemory, resumePointForStage, transitionBus, transitionCrossing } from "./flow";
 import { deterministicTileVariant, ensureGroundTextures, GROUND_TEXTURE, type GroundTileKey, type GroundVisualState } from "./ground-tiles";
@@ -18,7 +19,7 @@ import { collectMemory, finishGame, getActiveElapsedMs, getSnapshot, patchSnapsh
 import { ensureTactileTextures, TACTILE_TEXTURE } from "./tactile-layer";
 import { describeDecisionBrick, rasterizeTactilePath, type TactileBrick } from "./tactile-tiles";
 import { isWalkable, movementUnderPoint, nearestSafeWalkablePoint, tileUnderPoint, type TileMapDefinition } from "./tilemap";
-import type { BusTransitState, CaneSurfaceKind, CrossingState, HudState, SceneId, TactilePathDefinition, TactilePathNode, TilePoint } from "./types";
+import type { BusTransitState, CaneSurfaceKind, ColorMemoryPoint, CrossingState, HudState, SceneId, TactilePathDefinition, TactilePathNode, TilePoint } from "./types";
 
 type Facing = "up" | "down" | "left" | "right";
 type RevealMode = "tap" | "hint" | null;
@@ -30,7 +31,8 @@ type CaneSurface = {
 
 type ColorPulse = TilePoint & { expiresAt: number; radius: number };
 
-const FACE_FRAME: Record<Facing, number> = { up: 0, left: 1, right: 2, down: 3 };
+const FACE_FRAME: Record<Facing, number> = { up: 1, left: 4, right: 7, down: 10 };
+const FACE_ROW: Record<Facing, number> = { up: 0, left: 1, right: 2, down: 3 };
 const FACE_VECTOR: Record<Facing, Phaser.Math.Vector2> = {
   up: new Phaser.Math.Vector2(0, -1),
   down: new Phaser.Math.Vector2(0, 1),
@@ -74,6 +76,9 @@ abstract class WalkScene extends Phaser.Scene {
   protected phoneCooldownUntil = 0;
   protected groundSprites: Array<{ sprite: Phaser.GameObjects.Image; textures: Record<GroundVisualState, string>; frames?: Record<GroundVisualState, string>; x: number; y: number; environment: boolean }> = [];
   private colorPulses: ColorPulse[] = [];
+  private cachedMemorySource: ColorMemoryPoint[] | null = null;
+  private cachedSceneMemory: ColorMemoryPoint[] = [];
+  private warmFades: Array<{ overlay: Phaser.GameObjects.Image; bornAt: number; duration: number }> = [];
   private tactileBricks: TactileBrick[] = [];
   private tactileSprites: Phaser.GameObjects.Image[] = [];
   private tactileLitUntil: number[] = [];
@@ -98,11 +103,14 @@ abstract class WalkScene extends Phaser.Scene {
 
   preload(): void {
     preloadEnvironmentAssets(this);
-    if (!this.textures.exists("traveler")) {
-      this.load.spritesheet("traveler", travelerUrl, { frameWidth: 627, frameHeight: 627 });
+    if (!this.textures.exists("traveler-walk")) {
+      this.load.spritesheet("traveler-walk", travelerWalkUrl, { frameWidth: 64, frameHeight: 64 });
     }
     if (!this.textures.exists("npc-spritesheet")) {
       this.load.spritesheet("npc-spritesheet", npcSpritesheetUrl, { frameWidth: 362, frameHeight: 362 });
+    }
+    if (!this.textures.exists("lam")) {
+      this.load.spritesheet("lam", lamUrl, { frameWidth: 64, frameHeight: 64 });
     }
   }
 
@@ -110,7 +118,6 @@ abstract class WalkScene extends Phaser.Scene {
     const map = this.tileMap();
     if (!map) throw new Error(`${this.sceneId} requires a complete tile map`);
     ensureGroundTextures(this);
-    ensureEnvironmentTextures(this);
     ensureCaneTextures(this);
     this.buildGround(map);
     map.decorations.forEach((decoration) => {
@@ -140,9 +147,20 @@ abstract class WalkScene extends Phaser.Scene {
     this.tactileLitUntil = this.tactileBricks.map(() => 0);
     this.revealGraphics = this.add.graphics().setDepth(26);
     const resumePoint = snapshot.scene === this.sceneId ? resumePointForStage(snapshot.resumeStage) : this.spawn;
-    this.player = this.add.sprite(resumePoint.x, resumePoint.y, "traveler", FACE_FRAME[this.facing]);
-    this.player.setScale(0.16).setDepth(resumePoint.y + 1);
-    this.player.setOrigin(0.5, 0.58);
+    (Object.keys(FACE_ROW) as Facing[]).forEach((facing) => {
+      const key = `walk-${facing}`;
+      if (this.anims.exists(key)) return;
+      const row = FACE_ROW[facing] * 3;
+      this.anims.create({
+        key,
+        frames: this.anims.generateFrameNumbers("traveler-walk", { frames: [row, row + 1, row + 2, row + 1] }),
+        frameRate: 7,
+        repeat: -1,
+      });
+    });
+    this.player = this.add.sprite(resumePoint.x, resumePoint.y, "traveler-walk", FACE_FRAME[this.facing]);
+    this.player.setDepth(resumePoint.y + 1);
+    this.player.setOrigin(0.5, 1);
     this.renderNpcs();
     this.caneSprite = this.add.image(this.player.x + 2, this.player.y + 4, "cane-up-idle").setDepth(this.player.y + 3);
     this.keys = this.input.keyboard!.addKeys({
@@ -216,10 +234,19 @@ abstract class WalkScene extends Phaser.Scene {
     this.groundSprites.push({ ...rendered, environment: true });
   }
 
+  private sceneColorMemory(): ColorMemoryPoint[] {
+    const source = getSnapshot().colorMemory;
+    if (source !== this.cachedMemorySource) {
+      this.cachedMemorySource = source;
+      this.cachedSceneMemory = source.filter((point) => point.scene === this.sceneId);
+    }
+    return this.cachedSceneMemory;
+  }
+
   private updateGroundColors(): void {
     if (!this.groundSprites.length) return;
     const pulses = this.colorPulses;
-    const memory = getSnapshot().colorMemory.filter((point) => point.scene === this.sceneId);
+    const memory = this.sceneColorMemory();
     for (const tile of this.groundSprites) {
       const lit = pulses.some((pulse) => Phaser.Math.Distance.Between(tile.x, tile.y, pulse.x, pulse.y) <= pulse.radius);
       const remembered = !lit && memory.some((point) => Phaser.Math.Distance.Between(tile.x, tile.y, point.x, point.y) <= point.radius);
@@ -232,6 +259,44 @@ abstract class WalkScene extends Phaser.Scene {
 
   protected forceWarmForTile(_tile: { x: number; y: number; environment: boolean }): boolean { return false; }
 
+  /**
+   * When a color pulse expires, affected tiles crossfade from the warm texture back
+   * to their memory/base state instead of popping. A fading warm overlay is placed
+   * just above each tile and dissolved over ~750ms.
+   */
+  private spawnWarmFade(pulse: ColorPulse, time: number): void {
+    if (getSnapshot().settings.reducedMotion) return;
+    let spawned = 0;
+    for (const tile of this.groundSprites) {
+      if (spawned >= 96) break;
+      if (Phaser.Math.Distance.Between(tile.x, tile.y, pulse.x, pulse.y) > pulse.radius) continue;
+      if (this.forceWarmForTile(tile)) continue;
+      const stillLit = this.colorPulses.some((active) => Phaser.Math.Distance.Between(tile.x, tile.y, active.x, active.y) <= active.radius);
+      if (stillLit) continue;
+      const overlay = this.add.image(tile.sprite.x, tile.sprite.y, tile.textures.warm, tile.frames?.warm)
+        .setOrigin(tile.sprite.originX, tile.sprite.originY)
+        .setDisplaySize(tile.sprite.displayWidth, tile.sprite.displayHeight)
+        .setFlipX(tile.sprite.flipX)
+        .setDepth(tile.sprite.depth + 0.01);
+      this.warmFades.push({ overlay, bornAt: time, duration: 750 });
+      spawned += 1;
+    }
+    while (this.warmFades.length > 240) this.warmFades.shift()?.overlay.destroy();
+  }
+
+  private updateWarmFades(time: number): void {
+    if (!this.warmFades.length) return;
+    this.warmFades = this.warmFades.filter((fade) => {
+      const progress = (time - fade.bornAt) / fade.duration;
+      if (progress >= 1) {
+        fade.overlay.destroy();
+        return false;
+      }
+      fade.overlay.setAlpha(1 - progress);
+      return true;
+    });
+  }
+
   update(time: number, delta: number): void {
     if (Phaser.Input.Keyboard.JustDown(this.keys.pause)) {
       this.scene.pause();
@@ -240,7 +305,12 @@ abstract class WalkScene extends Phaser.Scene {
     }
     this.updateMovement(time, delta);
     this.updateCane(time, delta);
-    this.colorPulses = this.colorPulses.filter((pulse) => pulse.expiresAt > time);
+    const expiredPulses = this.colorPulses.filter((pulse) => pulse.expiresAt <= time);
+    if (expiredPulses.length) {
+      this.colorPulses = this.colorPulses.filter((pulse) => pulse.expiresAt > time);
+      expiredPulses.forEach((pulse) => this.spawnWarmFade(pulse, time));
+    }
+    this.updateWarmFades(time);
     this.updateReveal(time);
     this.updateGroundColors();
     this.handleActions(time);
@@ -315,7 +385,7 @@ abstract class WalkScene extends Phaser.Scene {
   private renderNpcs(): void {
     NPC_DEFINITIONS.filter((definition) => definition.scene === this.sceneId).forEach((definition) => {
       const frame = definition.scene === "old-city" ? 0 : 4;
-      const sprite = this.add.sprite(definition.x, definition.y, "npc-spritesheet", frame).setScale(0.2).setDepth(definition.y + 1);
+      const sprite = this.add.sprite(definition.x, definition.y, "npc-spritesheet", frame).setScale(0.16).setDepth(definition.y + 1);
       if (!getSnapshot().settings.reducedMotion) this.tweens.add({ targets: sprite, y: definition.y - 2, duration: 760, yoyo: true, repeat: -1 });
       this.npcSprites.push({ definition, sprite });
     });
@@ -341,6 +411,8 @@ abstract class WalkScene extends Phaser.Scene {
     if (this.roadReturning) return;
     const input = this.getMovementInput();
     if (!input.lengthSq()) {
+      if (this.player.anims.isPlaying) this.player.anims.stop();
+      this.player.setFrame(FACE_FRAME[this.facing]);
       this.updateRoadBoundary(time);
       return;
     }
@@ -359,9 +431,12 @@ abstract class WalkScene extends Phaser.Scene {
     this.updateRoadBoundary(time);
     if (Math.abs(x) > Math.abs(y)) this.facing = x > 0 ? "right" : "left";
     else this.facing = y > 0 ? "down" : "up";
-    this.player.setFrame(FACE_FRAME[this.facing]);
     if (!getSnapshot().settings.reducedMotion) {
-      this.player.setScale(0.16, 0.16 + Math.sin(time / 85) * 0.004);
+      const animKey = `walk-${this.facing}`;
+      if (this.player.anims.currentAnim?.key !== animKey) this.player.play(animKey);
+    } else {
+      if (this.player.anims.isPlaying) this.player.anims.stop();
+      this.player.setFrame(FACE_FRAME[this.facing]);
     }
     if (time - this.lastStepAt > 360) {
       this.lastStepAt = time;
@@ -513,7 +588,7 @@ abstract class WalkScene extends Phaser.Scene {
     this.enhanceTactileAt(surface.point, time);
     this.colorPulses.push({ x: surface.point.x, y: surface.point.y, radius: 42, expiresAt: time + TACTILE_LIT_MS });
     const snapshot = getSnapshot();
-    const colorMemory = mergeColorMemory(snapshot.colorMemory, { scene: this.sceneId, x: surface.point.x, y: surface.point.y, radius: 38 }, 25);
+    const colorMemory = mergeColorMemory(snapshot.colorMemory, { scene: this.sceneId, x: surface.point.x, y: surface.point.y, radius: 38 }, 32);
     if (colorMemory !== snapshot.colorMemory) patchSnapshot({ colorMemory });
     this.onSurfaceContact(surface, time);
   }
@@ -674,6 +749,7 @@ export class BusStopScene extends WalkScene {
   protected onSurfaceContact(surface: CaneSurface): void {
     if (surface.kind !== "sign" || this.signConfirmed || surface.point.x !== BUS_STOP_SIGN.x) return;
     this.signConfirmed = true;
+    this.objectiveId = "board-17";
     collectMemory("border-hand");
     setCheckpoint("bus-stop-sign");
     audioDirector.interact();
@@ -782,7 +858,6 @@ export class BusRideScene extends Phaser.Scene {
 
   create(): void {
     ensureGroundTextures(this);
-    ensureEnvironmentTextures(this);
     BUS_INTERIOR_TILEMAP.groundRows.forEach((row, rowIndex) => [...row].forEach((char, colIndex) => {
       const key = BUS_INTERIOR_TILEMAP.legend[char] ?? "bus-floor";
       const variant = deterministicTileVariant("bus-ride", colIndex, rowIndex, key);
@@ -844,6 +919,8 @@ export class BusRideScene extends Phaser.Scene {
   private finishRide(): void {
     if (this.ended) return;
     this.ended = true;
+    // Skipping the ride before the 10.5s narration must not cost the memory.
+    collectMemory("bus-rain");
     const arrived = transitionBus(getSnapshot().busState, "arrive");
     patchSnapshot({ busState: arrived, scene: "old-city", objectiveId: "follow-old-city-path", resumeStage: "old-city-entry" });
     gameEvents.emit("chapter", { from: "bus-ride", to: "old-city" });
@@ -881,7 +958,7 @@ export class OldCityScene extends WalkScene {
 
   protected getMovementInput(): Phaser.Math.Vector2 {
     if (!this.railHeld) return super.getMovementInput();
-    const amount = Number(this.keys.up.isDown) - Number(this.keys.down.isDown);
+    const amount = Number(this.keys.up.isDown || this.keys.arrowUp.isDown) - Number(this.keys.down.isDown || this.keys.arrowDown.isDown);
     if (!amount) return new Phaser.Math.Vector2();
     const direction = new Phaser.Math.Vector2(
       OLD_CITY_HANDRAIL.end.x - OLD_CITY_HANDRAIL.start.x,
@@ -1147,7 +1224,16 @@ export class RuinsScene extends WalkScene {
 
   protected onSceneReady(): void {
     this.finaleGraphics = this.add.graphics().setDepth(16);
-    this.lam = this.add.sprite(232, 108, "traveler", 3).setScale(0.13).setTint(0x9b968d).setDepth(109);
+    this.lam = this.add.sprite(232, 108, "lam", 0).setTint(0x9b968d).setDepth(109);
+    this.lam.setOrigin(0.5, 1);
+    if (!this.anims.exists("lam-finale")) {
+      this.anims.create({
+        key: "lam-finale",
+        frames: this.anims.generateFrameNumbers("lam", { frames: [1, 1, 2, 2] }),
+        frameRate: 2,
+        repeat: -1,
+      });
+    }
     if (!getSnapshot().settings.reducedMotion) this.tweens.add({ targets: this.lam, y: 106, duration: 900, yoyo: true, repeat: -1 });
     this.announce("牌坊前的台阶反着灯光。林伯就在盲道尽头等你。");
   }
@@ -1188,10 +1274,12 @@ export class RuinsScene extends WalkScene {
     this.finaleTier = snapshot.memories.length;
     const reducedMotion = snapshot.settings.reducedMotion;
     if (reducedMotion) {
+      this.lam.setFrame(2);
       this.drawFinaleWave(true);
       this.time.delayedCall(250, () => this.finishFinale());
       return;
     }
+    this.lam.play("lam-finale");
     const line = this.finaleTier >= 3
       ? "一路留下的三段记忆同时亮起：道路、石墙、房屋和牌坊都恢复了雨后的暖色。"
       : this.finaleTier === 2
@@ -1207,7 +1295,7 @@ export class RuinsScene extends WalkScene {
     this.finaleWarmProgress = progress;
     this.finaleGraphics.clear();
     this.finaleGraphics.fillStyle(0xe0bd72, 0.1 + progress * 0.16);
-    this.finaleGraphics.fillCircle(this.lam.x, this.lam.y, 18 + progress * 28);
+    this.finaleGraphics.fillCircle(this.lam.x, this.lam.y - 24, 18 + progress * 28);
     this.lam.setTint(progress >= 0.35 ? 0xd7a85d : 0x9b968d);
   }
 

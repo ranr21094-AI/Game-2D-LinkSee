@@ -7,8 +7,8 @@ MARGIN = 2
 SCALE = 8
 
 PALETTES = {
-    "normal": dict(base=(125, 122, 108), grout=(74, 71, 60), seam_light=(150, 146, 128),
-                   ridge=(168, 162, 138), ridge_light=(196, 190, 164), ridge_dark=(88, 84, 68)),
+    "normal": dict(base=(104, 101, 88), grout=(56, 53, 44), seam_light=(132, 128, 110),
+                   ridge=(178, 172, 148), ridge_light=(208, 202, 176), ridge_dark=(70, 66, 52)),
     "lit": dict(base=(164, 134, 74), grout=(104, 84, 44), seam_light=(200, 172, 110),
                 ridge=(226, 198, 128), ridge_light=(246, 230, 176), ridge_dark=(128, 102, 52)),
 }
@@ -32,6 +32,10 @@ def draw_brick(draw: ImageDraw.ImageDraw, ox: int, oy: int, p: dict, kind: str, 
     for x in range(1, 15):
         draw.point((x0 + x, y0 + 1), fill=jitter(p["seam_light"], 5, rng))
         draw.point((x0 + x, y0 + 14), fill=jitter(p["grout"], 4, rng))
+    # side edges keep the brick silhouette readable on pale pavement
+    for y in range(2, 14):
+        draw.point((x0 + 1, y0 + y), fill=jitter(p["seam_light"], 5, rng))
+        draw.point((x0 + 14, y0 + y), fill=jitter(p["grout"], 4, rng))
     # worn corners
     for _ in range(wear):
         cx = x0 + rng.choice([1, 2, 13, 14])
@@ -77,10 +81,10 @@ def sheet(palette_name: str) -> Image.Image:
 
 
 def pavement(w: int, h: int, rng: random.Random) -> Image.Image:
-    """faux warm-gray stone pavement to judge how bricks sit in the scene"""
+    """faux plaza-gray pavement (luma ≈126, the worst-case ground tone) to judge brick readability"""
     img = Image.new("RGBA", (w, h))
     draw = ImageDraw.Draw(img)
-    base = (96, 94, 88)
+    base = (126, 126, 126)
     for y in range(h):
         for x in range(w):
             draw.point((x, y), fill=jitter(base, 9, rng))

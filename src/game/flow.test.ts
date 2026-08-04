@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { OLD_CITY_CROSSING } from "./content";
-import { checkpointForStage, constrainCrossingPosition, determineEnding, mergeColorMemory, resumePointForStage, transitionBus, transitionCrossing } from "./flow";
+import { checkpointForStage, COLOR_MEMORY_LIMIT, constrainCrossingPosition, determineEnding, mergeColorMemory, resumePointForStage, transitionBus, transitionCrossing } from "./flow";
 
 describe("bus state machine", () => {
   it("follows the seven required stages", () => {
@@ -73,5 +73,13 @@ describe("color memory", () => {
     expect(mergeColorMemory([], first)).toEqual([first]);
     expect(mergeColorMemory([first], { ...first, x: 108, y: 124 })).toEqual([first]);
     expect(mergeColorMemory([first], { ...first, x: 150 })).toHaveLength(2);
+  });
+
+  it("caps the memory list by dropping the oldest discoveries", () => {
+    const seed = Array.from({ length: COLOR_MEMORY_LIMIT }, (_, index) => ({ scene: "old-city" as const, x: index * 100, y: 120, radius: 38 }));
+    const merged = mergeColorMemory(seed, { scene: "old-city", x: 99999, y: 120, radius: 38 });
+    expect(merged).toHaveLength(COLOR_MEMORY_LIMIT);
+    expect(merged[0].x).toBe(100);
+    expect(merged[merged.length - 1].x).toBe(99999);
   });
 });
