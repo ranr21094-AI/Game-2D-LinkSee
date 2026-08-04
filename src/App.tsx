@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { audioDirector } from "./game/audio";
-import { TUTORIAL_LINES } from "./game/content";
+import { CHAPTER_NODES, OBJECTIVES, SCENE_LABELS, TUTORIAL_LINES } from "./game/content";
 import { destroyGame, pauseGame, resumeGame, startGame } from "./game/engine";
 import { gameEvents } from "./game/events";
 import { finishGame, getSnapshot, loadSnapshot, patchSnapshot, startNewGame } from "./game/store";
 import type { EndingId, GameSnapshotV2, HudState } from "./game/types";
 import type { BusTransitState, SceneId } from "./game/types";
+import chapterMapUrl from "./assets/chapter-map.png";
 
 const EMPTY_HUD: HudState = {
   objective: "沿四纹盲道前往17路车门",
@@ -16,7 +17,6 @@ const EMPTY_HUD: HudState = {
   sceneLabel: "關閘 · 17路候车区",
   hintCooling: false,
   contact: "尚未触碰到物体",
-  caneMode: false,
 };
 
 const ENDING_COPY: Record<EndingId, { title: string; body: string; quote: string }> = {
@@ -38,6 +38,7 @@ const ENDING_COPY: Record<EndingId, { title: string; body: string; quote: string
 };
 
 type Screen = "menu" | "tutorial" | "playing";
+type ChapterTransition = { from: SceneId; to: SceneId };
 
 export function App() {
   const [screen, setScreen] = useState<Screen>("menu");
@@ -45,6 +46,7 @@ export function App() {
   const [paused, setPaused] = useState(false);
   const [confirmReturn, setConfirmReturn] = useState(false);
   const [ending, setEnding] = useState<EndingId | null>(null);
+  const [chapter, setChapter] = useState<ChapterTransition | null>(null);
   const [saved, setSaved] = useState<GameSnapshotV2 | null>(() => loadSnapshot());
   const [showDevTools, setShowDevTools] = useState(import.meta.env.DEV);
   const mountRef = useRef<HTMLDivElement>(null);
@@ -54,13 +56,26 @@ export function App() {
     const offHud = gameEvents.on("hud", setHud);
     const offPause = gameEvents.on("pause", (value) => setPaused(value));
     const offEnding = gameEvents.on("ending", (value) => setEnding(value));
+    const offChapter = gameEvents.on("chapter", (value) => setChapter(value));
     return () => {
       offHud();
       offPause();
       offEnding();
+      offChapter();
       destroyGame();
     };
   }, []);
+
+  useEffect(() => {
+    if (!chapter) return;
+    const hide = window.setTimeout(() => setChapter(null), 2500);
+    const skip = () => setChapter(null);
+    window.addEventListener("keydown", skip, { once: true });
+    return () => {
+      window.clearTimeout(hide);
+      window.removeEventListener("keydown", skip);
+    };
+  }, [chapter]);
 
   useEffect(() => {
     if (screen !== "playing" || !mountRef.current) return;
@@ -118,27 +133,19 @@ export function App() {
   };
 
   const jumpDev = (scene: SceneId, busState: BusTransitState) => {
-    sessionStorage.setItem("sound-road-dev-reveal", "sweep");
-    patchSnapshot({ scene, busState, objectiveId: scene === "bus-stop" ? "board-17" : scene === "bus-interior" ? "find-seat" : scene === "bus-ride" ? "ride-to-camoes" : scene === "old-city" ? "follow-old-city-path" : scene === "old-city-crossing" ? "request-crossing" : "meet-lam" });
+    sessionStorage.setItem("sound-road-dev-reveal", "hint");
+    patchSnapshot({ scene, busState, objectiveId: scene === "bus-stop" ? (busState === "doorOpen" ? "board-17" : "find-stop-sign") : scene === "bus-interior" ? "find-seat" : scene === "bus-ride" ? "ride-to-camoes" : scene === "old-city" ? "follow-old-city-path" : scene === "old-city-crossing" ? "request-crossing" : "meet-lam" });
     startGame("phaser-game", scene);
   };
 
   const teleportDev = (x: number, y: number) => gameEvents.emit("devTeleport", { x, y });
   const teleportToCurrentTarget = () => {
-    const targetByObjective: Record<string, { x: number; y: number }> = {
-      "board-17": { x: 532, y: 188 },
-      "find-seat": { x: 350, y: 164 },
-      "ride-to-camoes": { x: 320, y: 180 },
-      "follow-old-city-path": { x: 395, y: 165 },
-      "follow-handrail": { x: 455, y: 120 },
-      "request-crossing": { x: 278, y: 288 },
-      "wait-crossing": { x: 278, y: 288 },
-      "cross-junction": { x: 430, y: 80 },
-      "meet-lam": { x: 240, y: 88 },
-    };
-    const target = targetByObjective[getSnapshot().objectiveId] ?? { x: 320, y: 180 };
+    const objective = OBJECTIVES[getSnapshot().objectiveId];
+    const target = objective && (objective.target.x !== 0 || objective.target.y !== 0)
+      ? objective.target
+      : { x: 320, y: 180 };
     teleportDev(target.x, target.y);
-    gameEvents.emit("devReveal", "sweep");
+    gameEvents.emit("devReveal", "hint");
   };
 
   return (
@@ -170,9 +177,9 @@ export function App() {
               <div className="tile-copy"><strong>4×4凸点</strong><span>{TUTORIAL_LINES[1]}</span></div>
             </div>
             <div className="key-grid">
-              <span><kbd>WASD</kbd> 行走</span><span><kbd>Space</kbd> 精确敲击</span>
-              <span><kbd>Shift+A/D</kbd> 手动摆杖</span><span><kbd>Q</kbd> 方向指引</span>
-              <span><kbd>E</kbd> 互动</span><span><kbd>H</kbd> 重复任务</span>
+              <span><kbd>WASD</kbd> 行走</span><span><kbd>Space</kbd> 一根盲杖敲击</span>
+              <span><kbd>Q</kbd> 方向指引</span><span><kbd>H</kbd> 重复任务</span>
+              <span><kbd>F</kbd> 手机定位</span><span><kbd>E</kbd> 互动</span>
             </div>
             <p className="tutorial-tip">城市以暖灰呈现。杖头触碰处会短暂恢复完整暖色，随后留下淡彩记忆；Q只指出目标方向，不会显示整条路线。</p>
             <button className="primary-button" onClick={enterGame}>进入17路候车区</button>
@@ -193,13 +200,14 @@ export function App() {
             <span>记忆 {String(hud.memories).padStart(2, "0")}</span>
             <span>纠偏 {String(hud.detours).padStart(2, "0")}</span>
           </aside>
-          <aside className={`hud-contact pixel-panel ${hud.caneMode ? "is-active" : ""}`} aria-live="polite">
-            <span className="hud-label">{hud.caneMode ? "手动摆杖中 · A/D" : "最近触觉"}</span>
+          <aside className="hud-contact pixel-panel" aria-live="polite">
+            <span className="hud-label">最近触觉 · 一根盲杖</span>
             <strong>{hud.contact}</strong>
           </aside>
           <div className="hud-controls pixel-panel" aria-label="操作提示">
-            <span><kbd>空格</kbd> 敲击</span><span><kbd>Shift+A/D</kbd> 摆杖</span>
-            <span><kbd>Q</kbd> {hud.hintCooling ? "冷却" : "方向"}</span><span><kbd>E</kbd> 互动</span>
+            <span><kbd>空格</kbd> 单杖敲击</span>
+            <span><kbd>Q</kbd> {hud.hintCooling ? "冷却" : "方向"}</span><span><kbd>F</kbd> 手机</span>
+            <span><kbd>E</kbd> 互动</span>
           </div>
           {(hud.subtitle || hud.prompt) && (
             <div className="dialogue-stack" style={{ fontSize: `${getSnapshot().settings.subtitleScale}em` }}>
@@ -208,6 +216,20 @@ export function App() {
             </div>
           )}
           <button className="pause-button" onClick={() => { pauseGame(); setPaused(true); }} aria-label="暂停游戏">Esc 暂停</button>
+          {chapter && (
+            <div className="chapter-interstitial" role="status" aria-live="polite">
+              <img src={chapterMapUrl} alt="澳门章节路线图" />
+              <div className="chapter-map-shade" />
+              <div className="chapter-copy pixel-panel">
+                <span className="eyebrow">章节路线</span>
+                <strong>{SCENE_LABELS[chapter.from]} → {SCENE_LABELS[chapter.to]}</strong>
+                <div className="chapter-nodes">
+                  {CHAPTER_NODES.map((node) => <span key={node.scene} className={node.scene === chapter.to ? "is-current" : ""}>{node.label}</span>)}
+                </div>
+                <small>任意键跳过</small>
+              </div>
+            </div>
+          )}
           {import.meta.env.DEV && showDevTools && (
             <div className="dev-tools" aria-label="开发流程跳转">
               <button onClick={() => jumpDev("bus-stop", "doorOpen")}>候车</button>
@@ -255,7 +277,7 @@ export function App() {
             <p>{endingCopy.body}</p>
             <blockquote>{endingCopy.quote}</blockquote>
             <dl className="ending-metrics">
-              <div><dt>记忆</dt><dd>{getSnapshot().memories.length} / 2</dd></div>
+              <div><dt>记忆</dt><dd>{getSnapshot().memories.length} / 3</dd></div>
               <div><dt>纠偏</dt><dd>{getSnapshot().detourScore}</dd></div>
             </dl>
             <button className="primary-button" onClick={backToMenu}>回到主菜单</button>

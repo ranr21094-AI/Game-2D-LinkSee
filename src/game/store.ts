@@ -1,12 +1,12 @@
 import type { EndingId, GameSnapshotV2, MemoryId, SceneId } from "./types";
 import { checkpointForScene } from "./flow";
 
-export const SAVE_KEY = "sound-road-macau-2d:v1";
+export const SAVE_KEY = "sound-road-macau-2d:v2";
 
 export function createInitialSnapshot(): GameSnapshotV2 {
   return {
-    version: 1,
-    objectiveId: "board-17",
+    version: 2,
+    objectiveId: "find-stop-sign",
     scene: "bus-stop",
     busState: "waiting",
     selectedSeatId: null,
@@ -34,7 +34,7 @@ export function loadSnapshot(): GameSnapshotV2 | null {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<GameSnapshotV2>;
-    if (parsed.version !== 1 || typeof parsed.scene !== "string" || !parsed.settings) return null;
+    if (parsed.version !== 2 || typeof parsed.scene !== "string" || !parsed.settings) return null;
     snapshot = {
       ...createInitialSnapshot(),
       ...parsed,

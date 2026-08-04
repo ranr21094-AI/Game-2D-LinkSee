@@ -4,7 +4,7 @@ export type TilePoint = { x: number; y: number };
 
 export type TactileTileKind = "guidance" | "decision";
 
-export type CaneSurfaceKind = "guidance" | "decision" | "stone" | "metal" | "obstacle";
+export type CaneSurfaceKind = "guidance" | "decision" | "stone" | "metal" | "obstacle" | "sign" | "seat" | "door" | "curb" | "person";
 
 export type ColorMemoryPoint = TilePoint & {
   scene: SceneId;
@@ -56,8 +56,6 @@ export type RevealProfile = {
   tapForwardTiles: number;
   tapBackTiles: number;
   tapDurationMs: number;
-  sweepTiles: number;
-  sweepDurationMs: number;
   hintTiles: number;
   hintDurationMs: number;
   hintCooldownMs: number;
@@ -85,7 +83,7 @@ export type GameSettings = {
 };
 
 export type GameSnapshotV2 = {
-  version: 1;
+  version: 2;
   objectiveId: string;
   scene: SceneId;
   busState: BusTransitState;
@@ -115,5 +113,4 @@ export type HudState = {
   sceneLabel: string;
   hintCooling: boolean;
   contact: string;
-  caneMode: boolean;
 };

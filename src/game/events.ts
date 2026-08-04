@@ -8,7 +8,8 @@ type EventMap = {
   announce: string;
   devTeleport: TilePoint;
   devInteract: undefined;
-  devReveal: "sweep" | "hint";
+  devReveal: "hint";
+  chapter: { from: SceneId; to: SceneId };
 };
 
 type Handler<T> = (payload: T) => void;

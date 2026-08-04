@@ -8,10 +8,9 @@ When implementing from a selected generated mock, treat that image as the source
 
 ## Durable visual direction
 
-- The selected target is concept option 3: a top-down chunky 16-bit Macau streetscape after rain at dusk.
-- Use deep indigo/slate scenery, restrained warm amber windows, a warm-gold cane reveal cone, continuous four-ridge tactile paths, and 4x4 decision dots.
+- 2026-08-04 superseded: the target is now a high-density 32px-feel top-down pixel town (reference images archived in `docs/q-align/`, modern blocks from refs 4/5, material richness from refs 2/3), brighter than the retired deep-indigo concept 3.
+- The city base is a bright readable warm gray (bright dusk / overcast, never near-black, never horror). Cane contact restores the full warm Macau-after-rain color for about two seconds, then fades to a persistent ~35% pale-tint color memory.
 - Keep the HUD in the corners with thin brass pixel frames; Chinese body copy must remain comfortably readable rather than using an all-pixel display face.
-- The mood is quiet, warm, and dignified—never horror.
 - The desktop game canvas is 640x360 with nearest-neighbor scaling and integer pixel alignment.
 
 ## 2026-08-04 rework decisions
@@ -21,7 +20,15 @@ When implementing from a selected generated mock, treat that image as the source
 - Tactile paving is a semantic game layer, never baked into a background image. Guidance modules show four raised ridges; decision modules show a 4x4 dot grid with pixel highlights, shadows, and cane collision.
 - Manual cane mode: hold Shift, use A/D to swing the cane, and use W/S for careful forward/back steps. Space remains a precise forward tap.
 - Short wrong branches are explorable and require the player to notice mismatched surfaces and return. There is no automatic reset.
-- Q remains an optional direction arrow toward the current objective; it must not recolor or expose the full tactile route.
+- Q remains an optional direction arrow toward the current objective; it must not recolor or expose the full tactile route. The route-memory map idea is cut.
 - Preserve the existing protagonist, Lam, route 17, memories, endings, and story. Rework the existing project in place and validate locally before any public deployment.
+
+## 2026-08-04 tile-layer decisions (confirmed with owner)
+
+- Maps are built as a true tilemap with standalone tile assets (no more single whole-image backgrounds as the scene). Tactile paving is a real, always-visible tile layer embedded in the pavement — 16px bricks whose four ridges / 4x4 dots are drawn with a chunkier 32px feel, with a 1px top highlight, 1–2px bottom shadow, and pavement seams. Cane contact only enhances the 2–4 bricks near the tip; nothing summons glowing route lines.
+- Player and cane sprites depth-sort above the tactile layer so feet and cane tip occlude the bricks.
+- Decision bricks trigger a short tactile-judgment readout derived from path topology (continue ahead / new path left / rail right / curb ahead).
+- Interruption strategies are equal options: sweep to find the path, hold the rail; phone location check and asking passersby are deferred to milestone 3. Pre-departure route briefing arrives with the bus-segment milestone 2.
+- Milestone order: M1 validates the Camoes Garden segment (alight → tactile turn → find the rail); M2 bus segment; M3 old city density, crossing, full-color finale at the Ruins; M4 NPCs and delivery. Full plan: `docs/q-align/rework-plan.md`.
 
 Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts/prepare-sites-build.mjs`, and `tests/sites-worker.test.mjs` intact so the same local prototype can be handed to Sites. Before a Sites handoff, run `npm run build` and `npm run test:sites`; the build must leave `dist/client/index.html`, `dist/server/index.js`, and `dist/.openai/hosting.json`.

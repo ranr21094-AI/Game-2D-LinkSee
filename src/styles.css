@@ -137,7 +137,7 @@ kbd { min-width: 39px; padding: 3px 7px; border: 1px solid #ded6c7; background: 
 .game-stage { position: relative; width: 100%; height: 100%; overflow: hidden; background: #061018; }
 .phaser-mount { position: absolute; inset: 0; display: grid; place-items: center; }
 .phaser-mount canvas { width: 100% !important; height: 100% !important; object-fit: contain; image-rendering: pixelated; }
-.screen-shade { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 120px 34px rgba(0, 4, 8, 0.58); }
+.screen-shade { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 120px 34px rgba(10, 10, 8, 0.36); }
 
 .hud-objective, .hud-memory, .hud-controls, .hud-contact { position: absolute; z-index: 4; }
 .hud-objective { top: 18px; left: 18px; width: min(360px, calc(100vw - 150px)); padding: 12px 16px; }
@@ -158,6 +158,18 @@ kbd { min-width: 39px; padding: 3px 7px; border: 1px solid #ded6c7; background: 
 .pause-button { position: absolute; z-index: 6; left: 18px; bottom: 18px; border: 1px solid #766d5e; background: rgba(4, 9, 12, 0.9); padding: 7px 10px; color: #c8c1b5; }
 .dev-tools { position: absolute; z-index: 8; left: 110px; bottom: 18px; display: flex; gap: 4px; padding: 4px; background: rgba(2, 6, 8, 0.82); border: 1px dashed #8b7b5e; }
 .dev-tools button { border: 1px solid #5f5a51; background: #101516; color: #cfc6b5; padding: 4px 7px; font-size: 0.66rem; }
+
+.chapter-interstitial { position: absolute; z-index: 15; inset: 0; display: grid; place-items: center; overflow: hidden; background: #16130f; }
+.chapter-interstitial > img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; filter: saturate(0.76) contrast(1.03); }
+.chapter-map-shade { position: absolute; inset: 0; background: rgba(14, 13, 11, 0.22); pointer-events: none; }
+.chapter-copy { position: absolute; left: 50%; bottom: 24px; width: min(590px, calc(100% - 34px)); transform: translateX(-50%); padding: 13px 16px; text-align: center; }
+.chapter-copy strong { display: block; color: #ffe4a1; font-family: "Noto Serif CJK SC", "SimSun", serif; font-size: 1.25rem; }
+.chapter-copy small { display: block; margin-top: 8px; color: #aaa194; }
+.chapter-nodes { display: flex; justify-content: space-between; gap: 7px; margin-top: 12px; color: #aaa194; font-size: 0.78rem; }
+.chapter-nodes span { position: relative; flex: 1; padding-top: 8px; border-top: 2px solid #686052; }
+.chapter-nodes span::before { content: ""; position: absolute; top: -6px; left: 50%; width: 8px; height: 8px; transform: translateX(-50%); border: 2px solid #b99f77; background: #1a1916; }
+.chapter-nodes span.is-current { color: #ffe3a0; border-top-color: #f0c962; }
+.chapter-nodes span.is-current::before { background: #f0c962; }
 
 .modal-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(1, 5, 8, 0.82); }
 .pause-card, .ending-card { width: min(500px, 100%); padding: 30px; text-align: center; }

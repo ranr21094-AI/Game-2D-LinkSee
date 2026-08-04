@@ -38,19 +38,26 @@ export function constrainCrossingPosition(state: CrossingState, position: TilePo
   }
   if (state !== "walk") return position;
 
+  const halfWidth = definition.corridorWidth / 2;
   const dx = definition.farCurb.x - definition.requestPoint.x;
   const dy = definition.farCurb.y - definition.requestPoint.y;
-  const lengthSq = Math.max(1, dx * dx + dy * dy);
-  const relativeX = position.x - definition.requestPoint.x;
-  const relativeY = position.y - definition.requestPoint.y;
-  const t = Math.max(0, Math.min(1, (relativeX * dx + relativeY * dy) / lengthSq));
-  const center = { x: definition.requestPoint.x + dx * t, y: definition.requestPoint.y + dy * t };
-  const offsetX = position.x - center.x;
-  const offsetY = position.y - center.y;
-  const distance = Math.hypot(offsetX, offsetY);
-  const halfWidth = definition.corridorWidth / 2;
-  if (distance <= halfWidth || distance === 0) return position;
-  return { x: center.x + (offsetX / distance) * halfWidth, y: center.y + (offsetY / distance) * halfWidth };
+  const startX = Math.min(definition.requestPoint.x, definition.farCurb.x);
+  const endX = Math.max(definition.requestPoint.x, definition.farCurb.x);
+  const startY = Math.min(definition.requestPoint.y, definition.farCurb.y);
+  const endY = Math.max(definition.requestPoint.y, definition.farCurb.y);
+
+  // Keep the crossing orthogonal: the player stays inside one straight
+  // vertical or horizontal corridor and is never projected onto a diagonal.
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return {
+      x: Math.max(startX, Math.min(endX, position.x)),
+      y: Math.max(definition.requestPoint.y - halfWidth, Math.min(definition.requestPoint.y + halfWidth, position.y)),
+    };
+  }
+  return {
+    x: Math.max(definition.requestPoint.x - halfWidth, Math.min(definition.requestPoint.x + halfWidth, position.x)),
+    y: Math.max(startY, Math.min(endY, position.y)),
+  };
 }
 
 export function determineEnding(metrics: EndingMetrics): EndingId {
@@ -67,7 +74,7 @@ export function mergeColorMemory(points: ColorMemoryPoint[], next: ColorMemoryPo
 
 export function checkpointForScene(scene: SceneId): Pick<GameSnapshotV2, "scene" | "objectiveId"> {
   const objectiveByScene: Record<SceneId, string> = {
-    "bus-stop": "board-17",
+    "bus-stop": "find-stop-sign",
     "bus-interior": "find-seat",
     "bus-ride": "ride-to-camoes",
     "old-city": "follow-old-city-path",

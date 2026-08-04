@@ -45,12 +45,9 @@ describe("crossing state machine", () => {
     expect(constrainCrossingPosition("requested", { x: 410, y: 180 }, OLD_CITY_CROSSING)).toEqual({ x: 340, y: 258 });
 
     const constrained = constrainCrossingPosition("walk", { x: 420, y: 260 }, OLD_CITY_CROSSING);
-    const dx = OLD_CITY_CROSSING.farCurb.x - OLD_CITY_CROSSING.requestPoint.x;
-    const dy = OLD_CITY_CROSSING.farCurb.y - OLD_CITY_CROSSING.requestPoint.y;
-    const relativeX = constrained.x - OLD_CITY_CROSSING.requestPoint.x;
-    const relativeY = constrained.y - OLD_CITY_CROSSING.requestPoint.y;
-    const distance = Math.abs(relativeX * dy - relativeY * dx) / Math.hypot(dx, dy);
-    expect(distance).toBeLessThanOrEqual(OLD_CITY_CROSSING.corridorWidth / 2 + 0.001);
+    expect(constrained.x).toBe(OLD_CITY_CROSSING.requestPoint.x + OLD_CITY_CROSSING.corridorWidth / 2);
+    expect(constrained.y).toBe(260);
+    expect(constrainCrossingPosition("walk", { x: 278, y: 20 }, OLD_CITY_CROSSING).y).toBe(80);
   });
 });
 
