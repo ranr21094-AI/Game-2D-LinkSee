@@ -6,6 +6,7 @@ import type { SceneId } from "./types";
 
 let game: Phaser.Game | null = null;
 let resizeHandler: (() => void) | null = null;
+let resizeObserver: ResizeObserver | null = null;
 let visibilityHandler: (() => void) | null = null;
 let manuallyPaused = false;
 
@@ -51,7 +52,7 @@ export function startGame(parent: string, initialScene: SceneId): Phaser.Game {
     if (!game) return;
     const host = document.getElementById(parent)?.getBoundingClientRect();
     const ratio = Math.min((host?.width ?? window.innerWidth) / 640, (host?.height ?? window.innerHeight) / 360);
-    game.scale.setZoom(ratio >= 1 ? Math.max(1, Math.floor(ratio)) : Math.max(0.4, ratio));
+    game.scale.setZoom(Math.max(0.4, ratio));
     game.scale.refresh();
   };
   visibilityHandler = () => {
@@ -64,6 +65,11 @@ export function startGame(parent: string, initialScene: SceneId): Phaser.Game {
     }
   };
   window.addEventListener("resize", resizeHandler);
+  const hostElement = document.getElementById(parent);
+  if (hostElement && typeof ResizeObserver !== "undefined") {
+    resizeObserver = new ResizeObserver(() => resizeHandler?.());
+    resizeObserver.observe(hostElement);
+  }
   document.addEventListener("visibilitychange", visibilityHandler);
   resizeHandler();
   resumeActiveTimer();
@@ -90,6 +96,8 @@ export function destroyGame(): void {
   pauseActiveTimer();
   audioDirector.pause();
   if (resizeHandler) window.removeEventListener("resize", resizeHandler);
+  resizeObserver?.disconnect();
+  resizeObserver = null;
   if (visibilityHandler) document.removeEventListener("visibilitychange", visibilityHandler);
   resizeHandler = null;
   visibilityHandler = null;

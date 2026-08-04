@@ -20,6 +20,7 @@ When implementing from a selected generated mock, treat that image as the source
 - G key is a phone-torch flash: radius-220 warm pulse for 1.8s plus a brief full-screen warm overlay, 8s cooldown.
 - The cane sprite is anchored at the hand (y-28 with the feet-anchored 56px protagonist), tilted ±38° when facing left/right; the logical probe point stays at the feet.
 - Space probe range stays 18–42px (owner reviewed a 24–56px proposal and chose to keep the current tuning).
+- Canvas zoom fits the right pane proportionally at the native 16:9 ratio (fractional zoom allowed, nearest-neighbor rendering kept) — strict integer zoom left the canvas tiny at common browser zoom levels such as 150%. A ResizeObserver on the mount recomputes the zoom on any layout change.
 
 ## 2026-08-04 rework decisions
 
