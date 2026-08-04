@@ -216,60 +216,64 @@ export function App() {
 
       {screen === "playing" && (
         <section className="game-stage" aria-label="声路澳门2D游戏">
-          <div id="phaser-game" ref={mountRef} className="phaser-mount" />
-          <div className="screen-shade" aria-hidden="true" />
-          <aside className="hud-objective pixel-panel" aria-live="polite">
-            <span className="hud-label">当前任务</span>
-            <strong>{hud.objective}</strong>
-            <small>{hud.sceneLabel}</small>
-          </aside>
-          <aside className="hud-memory pixel-panel" aria-label="旅程状态">
-            <span>记忆 {String(hud.memories).padStart(2, "0")}</span>
-            <span>纠偏 {String(hud.detours).padStart(2, "0")}</span>
-          </aside>
-          <aside className="hud-contact pixel-panel" aria-live="polite">
-            <span className="hud-label">最近触觉 · 一根盲杖</span>
-            <strong>{hud.contact}</strong>
-          </aside>
-          <div className="hud-controls pixel-panel" aria-label="操作提示">
-            <span><kbd>空格</kbd> 单杖敲击</span>
-            <span><kbd>Q</kbd> {hud.hintCooling ? "冷却" : "方向"}</span><span><kbd>F</kbd> 手机</span>
-            <span><kbd>G</kbd> 照亮</span><span><kbd>E</kbd> 互动</span>
-          </div>
-          {(hud.subtitle || hud.prompt) && (
-            <div className="dialogue-stack" style={{ fontSize: `${getSnapshot().settings.subtitleScale}em` }}>
-              {hud.subtitle && <p className="subtitle pixel-panel" aria-live="assertive">{hud.subtitle}</p>}
-              {hud.prompt && <p className="interact-prompt">{hud.prompt}</p>}
+          <aside className="side-panel" aria-label="旅程功能栏">
+            <div className="hud-objective pixel-panel" aria-live="polite">
+              <span className="hud-label">当前任务</span>
+              <strong>{hud.objective}</strong>
+              <small>{hud.sceneLabel}</small>
             </div>
-          )}
-          <button className="pause-button" onClick={() => { pauseGame(); setPaused(true); }} aria-label="暂停游戏">Esc 暂停</button>
-          {chapter && (
-            <div className="chapter-interstitial" role="status" aria-live="polite">
-              <img src={chapterMapUrl} alt="澳门章节路线图" />
-              <div className="chapter-map-shade" />
-              <div className="chapter-copy pixel-panel">
-                <span className="eyebrow">章节路线</span>
-                <strong>{SCENE_LABELS[chapter.from]} → {SCENE_LABELS[chapter.to]}</strong>
-                <div className="chapter-nodes">
-                  {CHAPTER_NODES.map((node) => <span key={node.scene} className={node.scene === chapter.to ? "is-current" : ""}>{node.label}</span>)}
-                </div>
-                <small>任意键跳过</small>
+            <div className="hud-memory pixel-panel" aria-label="旅程状态">
+              <span>记忆 {String(hud.memories).padStart(2, "0")}</span>
+              <span>纠偏 {String(hud.detours).padStart(2, "0")}</span>
+            </div>
+            <div className="hud-contact pixel-panel" aria-live="polite">
+              <span className="hud-label">最近触觉 · 一根盲杖</span>
+              <strong>{hud.contact}</strong>
+            </div>
+            <div className="hud-controls pixel-panel" aria-label="操作提示">
+              <span><kbd>空格</kbd> 单杖敲击</span>
+              <span><kbd>Q</kbd> {hud.hintCooling ? "冷却" : "方向"}</span><span><kbd>F</kbd> 手机</span>
+              <span><kbd>G</kbd> 照亮</span><span><kbd>E</kbd> 互动</span>
+            </div>
+            <button className="pause-button" onClick={() => { pauseGame(); setPaused(true); }} aria-label="暂停游戏">Esc 暂停</button>
+            {import.meta.env.DEV && showDevTools && (
+              <div className="dev-tools" aria-label="开发流程跳转">
+                <button onClick={() => jumpDev("bus-stop", "doorOpen")}>候车</button>
+                <button onClick={() => jumpDev("bus-interior", "boarding")}>车厢</button>
+                <button onClick={teleportToCurrentTarget}>到目标</button>
+                <button onClick={() => gameEvents.emit("devInteract", undefined)}>执行E</button>
+                <button onClick={() => jumpDev("bus-ride", "seated")}>过场</button>
+                <button onClick={() => jumpDev("old-city", "arrived")}>旧城</button>
+                <button onClick={() => jumpDev("old-city-crossing", "alighted")}>路口</button>
+                <button onClick={() => jumpDev("ruins", "alighted")}>终点</button>
+                <button onClick={() => setShowDevTools(false)}>隐藏测试栏</button>
               </div>
-            </div>
-          )}
-          {import.meta.env.DEV && showDevTools && (
-            <div className="dev-tools" aria-label="开发流程跳转">
-              <button onClick={() => jumpDev("bus-stop", "doorOpen")}>候车</button>
-              <button onClick={() => jumpDev("bus-interior", "boarding")}>车厢</button>
-              <button onClick={teleportToCurrentTarget}>到目标</button>
-              <button onClick={() => gameEvents.emit("devInteract", undefined)}>执行E</button>
-              <button onClick={() => jumpDev("bus-ride", "seated")}>过场</button>
-              <button onClick={() => jumpDev("old-city", "arrived")}>旧城</button>
-              <button onClick={() => jumpDev("old-city-crossing", "alighted")}>路口</button>
-              <button onClick={() => jumpDev("ruins", "alighted")}>终点</button>
-              <button onClick={() => setShowDevTools(false)}>隐藏测试栏</button>
-            </div>
-          )}
+            )}
+          </aside>
+          <div className="game-view">
+            <div id="phaser-game" ref={mountRef} className="phaser-mount" />
+            <div className="screen-shade" aria-hidden="true" />
+            {(hud.subtitle || hud.prompt) && (
+              <div className="dialogue-stack" style={{ fontSize: `${getSnapshot().settings.subtitleScale}em` }}>
+                {hud.subtitle && <p className="subtitle pixel-panel" aria-live="assertive">{hud.subtitle}</p>}
+                {hud.prompt && <p className="interact-prompt">{hud.prompt}</p>}
+              </div>
+            )}
+            {chapter && (
+              <div className="chapter-interstitial" role="status" aria-live="polite">
+                <img src={chapterMapUrl} alt="澳门章节路线图" />
+                <div className="chapter-map-shade" />
+                <div className="chapter-copy pixel-panel">
+                  <span className="eyebrow">章节路线</span>
+                  <strong>{SCENE_LABELS[chapter.from]} → {SCENE_LABELS[chapter.to]}</strong>
+                  <div className="chapter-nodes">
+                    {CHAPTER_NODES.map((node) => <span key={node.scene} className={node.scene === chapter.to ? "is-current" : ""}>{node.label}</span>)}
+                  </div>
+                  <small>任意键跳过</small>
+                </div>
+              </div>
+            )}
+          </div>
         </section>
       )}
 

@@ -13,6 +13,14 @@ When implementing from a selected generated mock, treat that image as the source
 - Keep the HUD in the corners with thin brass pixel frames; Chinese body copy must remain comfortably readable rather than using an all-pixel display face.
 - The desktop game canvas is 640x360 with nearest-neighbor scaling and integer pixel alignment.
 
+## 2026-08-05 lighting-rule and layout decisions (confirmed with owner)
+
+- Page layout superseded the corner HUD: all function panels (objective, memory, contact, controls, pause, dev tools) live in a left sidebar (~1/4 width); the game canvas fills the right ~3/4, still integer-scaled at the native 16:9 ratio. Subtitles and chapter interstitials stay overlaid on the game view.
+- Movement is restricted to brightly lit (warm) ground only: active color pulses (cane-tap radius 42 / 2s, spawn pulse, G flash) and forced-warm tiles are walkable; pale color memory and base gray are not. Exceptions: holding the old-city handrail, and the crossing walk/crossed states. Blocked moves announce a throttled hint instead of failing.
+- G key is a phone-torch flash: radius-220 warm pulse for 1.8s plus a brief full-screen warm overlay, 8s cooldown.
+- The cane sprite is anchored at the hand (y-28 with the feet-anchored 56px protagonist), tilted ±38° when facing left/right; the logical probe point stays at the feet.
+- Space probe range stays 18–42px (owner reviewed a 24–56px proposal and chose to keep the current tuning).
+
 ## 2026-08-04 rework decisions
 
 - Replace the near-black presentation with a readable warm-gray city. Cane contact restores the original warm color for roughly two seconds, then leaves a persistent low-saturation color memory.
