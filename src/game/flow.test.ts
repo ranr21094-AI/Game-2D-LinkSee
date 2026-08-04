@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { OLD_CITY_CROSSING } from "./content";
-import { checkpointForScene, constrainCrossingPosition, determineEnding, transitionBus, transitionCrossing } from "./flow";
+import { checkpointForScene, constrainCrossingPosition, determineEnding, mergeColorMemory, transitionBus, transitionCrossing } from "./flow";
 
 describe("bus state machine", () => {
   it("follows the seven required stages", () => {
@@ -66,5 +66,14 @@ describe("ending selection", () => {
 
   it("selects reunion for a direct arrival", () => {
     expect(determineEnding({ elapsedSeconds: 300, detourScore: 2, returnRequested: false })).toBe("reunion");
+  });
+});
+
+describe("color memory", () => {
+  it("keeps distant discoveries and deduplicates nearby cane contacts", () => {
+    const first = { scene: "old-city" as const, x: 100, y: 120, radius: 38 };
+    expect(mergeColorMemory([], first)).toEqual([first]);
+    expect(mergeColorMemory([first], { ...first, x: 108, y: 124 })).toEqual([first]);
+    expect(mergeColorMemory([first], { ...first, x: 150 })).toHaveLength(2);
   });
 });

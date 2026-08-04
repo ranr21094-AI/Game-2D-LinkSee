@@ -4,6 +4,13 @@ export type TilePoint = { x: number; y: number };
 
 export type TactileTileKind = "guidance" | "decision";
 
+export type CaneSurfaceKind = "guidance" | "decision" | "stone" | "metal" | "obstacle";
+
+export type ColorMemoryPoint = TilePoint & {
+  scene: SceneId;
+  radius: number;
+};
+
 export type TactilePathNode = TilePoint & {
   kind: TactileTileKind;
   taskId?: string;
@@ -89,6 +96,7 @@ export type GameSnapshotV2 = {
   elapsedBeforeResume: number;
   returnRequested: boolean;
   ending: EndingId | null;
+  colorMemory: ColorMemoryPoint[];
   settings: GameSettings;
 };
 
@@ -106,4 +114,6 @@ export type HudState = {
   detours: number;
   sceneLabel: string;
   hintCooling: boolean;
+  contact: string;
+  caneMode: boolean;
 };

@@ -3,17 +3,24 @@ import busStopUrl from "../assets/bus-stop.png";
 import busInteriorUrl from "../assets/bus-interior.png";
 import busRideUrl from "../assets/bus-ride.png";
 import crossingUrl from "../assets/old-city-crossing.png";
-import oldCityUrl from "../assets/old-city.png";
+import oldCityUrl from "../assets/old-city-rework.png";
 import travelerUrl from "../assets/traveler.png";
 import { audioDirector } from "./audio";
 import { OBJECTIVES, OLD_CITY_CROSSING, OLD_CITY_HANDRAIL, PATHS, REVEAL_PROFILE, SCENE_LABELS } from "./content";
 import { gameEvents } from "./events";
-import { constrainCrossingPosition, determineEnding, transitionBus, transitionCrossing } from "./flow";
+import { constrainCrossingPosition, determineEnding, mergeColorMemory, transitionBus, transitionCrossing } from "./flow";
 import { collectMemory, finishGame, getSnapshot, patchSnapshot, setCheckpoint } from "./store";
-import type { BusTransitState, CrossingState, HudState, SceneId, TactilePathDefinition, TactilePathNode } from "./types";
+import type { BusTransitState, CaneSurfaceKind, CrossingState, HudState, SceneId, TactilePathDefinition, TactilePathNode, TilePoint } from "./types";
 
 type Facing = "up" | "down" | "left" | "right";
 type RevealMode = "tap" | "sweep" | "hint" | null;
+type CaneSurface = {
+  kind: CaneSurfaceKind;
+  label: string;
+  point: Phaser.Math.Vector2;
+};
+
+type ColorPulse = TilePoint & { expiresAt: number; radius: number };
 
 const FACE_FRAME: Record<Facing, number> = { up: 0, left: 1, right: 2, down: 3 };
 const FACE_VECTOR: Record<Facing, Phaser.Math.Vector2> = {
@@ -48,6 +55,7 @@ abstract class WalkScene extends Phaser.Scene {
   protected player!: Phaser.GameObjects.Sprite;
   protected pathGraphics!: Phaser.GameObjects.Graphics;
   protected revealGraphics!: Phaser.GameObjects.Graphics;
+  protected caneGraphics!: Phaser.GameObjects.Graphics;
   protected path!: TactilePathDefinition;
   protected facing: Facing = "up";
   protected revealMode: RevealMode = null;
@@ -57,6 +65,18 @@ abstract class WalkScene extends Phaser.Scene {
   protected prompt = "";
   protected subtitle = "";
   protected trackDetours = true;
+  protected contact = "尚未触碰到物体";
+  protected caneMode = false;
+  protected caneAngle = 0;
+  private colorPersistentMask!: Phaser.GameObjects.Graphics;
+  private colorPulseMask!: Phaser.GameObjects.Graphics;
+  private colorPersistentImage!: Phaser.GameObjects.Image;
+  private colorPulseImage!: Phaser.GameObjects.Image;
+  private colorPulses: ColorPulse[] = [];
+  private lastCaneSampleAt = 0;
+  private lastContactKey = "";
+  private lastContactAt = 0;
+  private tapExtensionUntil = 0;
   private previousHud = "";
   private lastDetourAt = 0;
   private wasOnRoute = true;
@@ -73,15 +93,22 @@ abstract class WalkScene extends Phaser.Scene {
 
   create(): void {
     const bg = this.add.image(320, 180, this.backgroundKey).setDisplaySize(640, 360);
-    bg.setTint(0xb7c1c6);
-    this.add.rectangle(320, 180, 640, 360, 0x061018, 0.18);
+    bg.setTint(0xd0ccc4);
+    bg.postFX?.addColorMatrix().grayscale(1);
+    this.colorPersistentImage = this.add.image(320, 180, this.backgroundKey).setDisplaySize(640, 360).setAlpha(0.34).setDepth(1);
+    this.colorPulseImage = this.add.image(320, 180, this.backgroundKey).setDisplaySize(640, 360).setDepth(2);
+    this.colorPersistentMask = this.make.graphics({}, false);
+    this.colorPulseMask = this.make.graphics({}, false);
+    this.colorPersistentImage.setMask(this.colorPersistentMask.createGeometryMask());
+    this.colorPulseImage.setMask(this.colorPulseMask.createGeometryMask());
     this.path = PATHS[this.sceneId];
-    this.pathGraphics = this.add.graphics();
-    this.revealGraphics = this.add.graphics();
-    this.drawPath(this.pathGraphics, 0x131a19, 0.74);
+    this.pathGraphics = this.add.graphics().setDepth(7);
+    this.revealGraphics = this.add.graphics().setDepth(8);
+    this.drawPath(this.pathGraphics, 0x797a74, 0.92);
     this.player = this.add.sprite(this.spawn.x, this.spawn.y, "traveler", FACE_FRAME[this.facing]);
     this.player.setScale(0.16).setDepth(20);
     this.player.setOrigin(0.5, 0.58);
+    this.caneGraphics = this.add.graphics().setDepth(23);
     this.keys = this.input.keyboard!.addKeys({
       up: Phaser.Input.Keyboard.KeyCodes.W,
       down: Phaser.Input.Keyboard.KeyCodes.S,
@@ -134,7 +161,9 @@ abstract class WalkScene extends Phaser.Scene {
       return;
     }
     this.updateMovement(time, delta);
+    this.updateCane(time, delta);
     this.updateReveal(time);
+    this.updateColorMasks(time);
     this.handleActions(time);
     this.checkRoute(time);
     this.updateInteraction(time);
@@ -164,6 +193,10 @@ abstract class WalkScene extends Phaser.Scene {
   }
 
   protected getMovementInput(): Phaser.Math.Vector2 {
+    if (this.keys?.sweep?.isDown) {
+      const amount = Number(this.keys.up.isDown) - Number(this.keys.down.isDown);
+      return FACE_VECTOR[this.facing].clone().scale(amount);
+    }
     return new Phaser.Math.Vector2(
       Number(this.keys.right.isDown) - Number(this.keys.left.isDown),
       Number(this.keys.down.isDown) - Number(this.keys.up.isDown),
@@ -188,43 +221,46 @@ abstract class WalkScene extends Phaser.Scene {
 
   protected onHint(_time: number): void {}
 
+  protected onSurfaceContact(_surface: CaneSurface, _time: number): void {}
+
   private updateMovement(time: number, delta: number): void {
     const input = this.getMovementInput();
     if (!input.lengthSq()) return;
     input.normalize();
     let x = input.x;
     let y = input.y;
-    const speed = this.revealMode === "sweep" ? 48 : 68;
+    const speed = this.caneMode ? 34 : 68;
     const current = new Phaser.Math.Vector2(this.player.x, this.player.y);
     const next = this.constrainMovement(current, new Phaser.Math.Vector2(
       this.player.x + x * speed * (delta / 1000),
       this.player.y + y * speed * (delta / 1000),
     ));
     this.player.setPosition(next.x, next.y);
-    if (Math.abs(x) > Math.abs(y)) this.facing = x > 0 ? "right" : "left";
-    else this.facing = y > 0 ? "down" : "up";
+    if (!this.caneMode) {
+      if (Math.abs(x) > Math.abs(y)) this.facing = x > 0 ? "right" : "left";
+      else this.facing = y > 0 ? "down" : "up";
+    }
     this.player.setFrame(FACE_FRAME[this.facing]);
     if (!getSnapshot().settings.reducedMotion) {
       this.player.setScale(0.16, 0.16 + Math.sin(time / 85) * 0.004);
     }
     if (time - this.lastStepAt > 360) {
       this.lastStepAt = time;
-      audioDirector.caneTap("stone");
+      audioDirector.footstep();
     }
   }
 
   private handleActions(time: number): void {
     if (Phaser.Input.Keyboard.JustDown(this.keys.tap)) {
       this.revealMode = "tap";
-      this.revealUntil = time + REVEAL_PROFILE.tapDurationMs;
-      audioDirector.caneTap(this.distanceToRoute() < 22 ? "tactile" : "stone");
+      this.revealUntil = time + 260;
+      this.tapExtensionUntil = time + 180;
+      this.performCaneContact(time, 46);
       this.onTap(time);
       this.player.setAngle(this.facing === "left" ? -4 : 4);
       this.time.delayedCall(140, () => this.player.setAngle(0));
     }
     if (Phaser.Input.Keyboard.JustDown(this.keys.sweep)) {
-      this.revealMode = "sweep";
-      this.revealUntil = time + REVEAL_PROFILE.sweepDurationMs;
       audioDirector.sweep();
       this.onSweep(time);
     }
@@ -234,7 +270,7 @@ abstract class WalkScene extends Phaser.Scene {
       this.hintCooldownUntil = time + REVEAL_PROFILE.hintCooldownMs;
       audioDirector.hint();
       this.onHint(time);
-      this.announce(this.repeatTaskText());
+      this.announce(`方向提示：目标在${this.directionToObjective()}。${OBJECTIVES[this.objectiveId].label}`);
     }
     if (Phaser.Input.Keyboard.JustDown(this.keys.repeat)) {
       const text = this.repeatTaskText();
@@ -248,36 +284,15 @@ abstract class WalkScene extends Phaser.Scene {
 
   private updateReveal(time: number): void {
     this.revealGraphics.clear();
-    if (time > this.revealUntil) {
-      this.revealMode = null;
-      return;
+    const saved = getSnapshot().colorMemory.filter((point) => point.scene === this.sceneId);
+    if (saved.length) {
+      this.drawPath(this.revealGraphics, 0xc69a45, 0.52, (point) => saved.some((memory) => Phaser.Math.Distance.Between(point.x, point.y, memory.x, memory.y) <= memory.radius));
     }
-    const radius = this.revealMode === "hint" ? 256 : this.revealMode === "sweep" ? 160 : 144;
-    this.drawRevealCone(radius);
-    this.drawPath(this.revealGraphics, REVEAL_PROFILE.color, 1, (point) => this.pointIsRevealed(point, radius));
-  }
-
-  private drawRevealCone(radius: number): void {
-    const direction = FACE_VECTOR[this.facing];
-    const centerAngle = Math.atan2(direction.y, direction.x);
-    const half = this.revealMode === "hint" ? Math.PI : this.revealMode === "sweep" ? Math.PI / 4 : Math.PI / 7;
-    const points = [new Phaser.Math.Vector2(this.player.x, this.player.y)];
-    for (let i = 0; i <= 24; i += 1) {
-      const angle = centerAngle - half + (i / 24) * half * 2;
-      points.push(new Phaser.Math.Vector2(this.player.x + Math.cos(angle) * radius, this.player.y + Math.sin(angle) * radius));
+    if (this.colorPulses.length) {
+      this.drawPath(this.revealGraphics, REVEAL_PROFILE.color, 1, (point) => this.colorPulses.some((pulse) => Phaser.Math.Distance.Between(point.x, point.y, pulse.x, pulse.y) <= pulse.radius));
     }
-    this.revealGraphics.fillStyle(0xf3c85b, this.revealMode === "hint" ? 0.11 : 0.16);
-    this.revealGraphics.fillPoints(points, true);
-    this.revealGraphics.lineStyle(1.5, 0xffdb77, 0.74);
-    this.revealGraphics.strokePoints(points.slice(1), false);
-  }
-
-  private pointIsRevealed(point: Phaser.Math.Vector2, radius: number): boolean {
-    const offset = new Phaser.Math.Vector2(point.x - this.player.x, point.y - this.player.y);
-    if (offset.length() > radius) return false;
-    if (this.revealMode === "hint") return true;
-    const angleCos = offset.clone().normalize().dot(FACE_VECTOR[this.facing]);
-    return angleCos >= (this.revealMode === "sweep" ? Math.SQRT1_2 : 0.8) || offset.length() < 34;
+    if (this.revealMode === "hint" && time <= this.revealUntil) this.drawDirectionArrow();
+    if (time > this.revealUntil) this.revealMode = null;
   }
 
   private drawPath(
@@ -294,29 +309,175 @@ abstract class WalkScene extends Phaser.Scene {
       const vector = new Phaser.Math.Vector2(b.x - a.x, b.y - a.y).normalize();
       const perpendicular = new Phaser.Math.Vector2(-vector.y, vector.x);
       const distance = Phaser.Math.Distance.Between(a.x, a.y, b.x, b.y);
-      const steps = visible ? Math.max(1, Math.ceil(distance / 10)) : 1;
+      const steps = Math.max(1, Math.ceil(distance / 16));
       for (let step = 0; step < steps; step += 1) {
         const startT = step / steps;
-        const endT = (step + 1) / steps;
+        const endT = Math.min(1, (step + 0.88) / steps);
         const start = new Phaser.Math.Vector2(Phaser.Math.Linear(a.x, b.x, startT), Phaser.Math.Linear(a.y, b.y, startT));
         const end = new Phaser.Math.Vector2(Phaser.Math.Linear(a.x, b.x, endT), Phaser.Math.Linear(a.y, b.y, endT));
         const midpoint = start.clone().lerp(end, 0.5);
         if (visible && !visible(midpoint)) continue;
+        const halfWidth = 9;
+        const corners = [
+          start.clone().add(perpendicular.clone().scale(-halfWidth)),
+          start.clone().add(perpendicular.clone().scale(halfWidth)),
+          end.clone().add(perpendicular.clone().scale(halfWidth)),
+          end.clone().add(perpendicular.clone().scale(-halfWidth)),
+        ];
+        graphics.fillStyle(0x222725, alpha * 0.45);
+        graphics.fillPoints(corners.map((point) => point.clone().add(new Phaser.Math.Vector2(1, 2))), true);
+        graphics.fillStyle(color, alpha * 0.38);
+        graphics.fillPoints(corners, true);
         [-6, -2, 2, 6].forEach((offset) => {
-          graphics.lineStyle(2, color, alpha);
+          graphics.lineStyle(2.5, 0x202321, alpha * 0.72);
+          graphics.lineBetween(start.x + perpendicular.x * offset + 1, start.y + perpendicular.y * offset + 1, end.x + perpendicular.x * offset + 1, end.y + perpendicular.y * offset + 1);
+          graphics.lineStyle(1.35, color, alpha);
           graphics.lineBetween(start.x + perpendicular.x * offset, start.y + perpendicular.y * offset, end.x + perpendicular.x * offset, end.y + perpendicular.y * offset);
         });
       }
     }
     nodes.filter((node) => node.kind === "decision").forEach((node) => {
       if (visible && !visible(new Phaser.Math.Vector2(node.x, node.y))) return;
-      graphics.fillStyle(color, alpha);
+      graphics.fillStyle(0x202321, alpha * 0.8);
+      graphics.fillRect(node.x - 13 + 1, node.y - 13 + 2, 26, 26);
+      graphics.fillStyle(color, alpha * 0.42);
+      graphics.fillRect(node.x - 13, node.y - 13, 26, 26);
       for (let row = 0; row < 4; row += 1) {
         for (let col = 0; col < 4; col += 1) {
-          graphics.fillCircle(node.x + (col - 1.5) * 5, node.y + (row - 1.5) * 5, 1.7);
+          const x = node.x + (col - 1.5) * 5.5;
+          const y = node.y + (row - 1.5) * 5.5;
+          graphics.fillStyle(0x1b1f1d, alpha * 0.9);
+          graphics.fillCircle(x + 1, y + 1.5, 2.5);
+          graphics.fillStyle(color, alpha);
+          graphics.fillCircle(x, y, 2.2);
+          graphics.fillStyle(0xf2ead7, alpha * 0.5);
+          graphics.fillCircle(x - 0.65, y - 0.65, 0.65);
         }
       }
     });
+  }
+
+  private updateCane(time: number, delta: number): void {
+    this.caneMode = this.keys.sweep.isDown;
+    if (this.caneMode) {
+      const swing = Number(this.keys.right.isDown) - Number(this.keys.left.isDown);
+      this.caneAngle = Phaser.Math.Clamp(this.caneAngle + swing * 112 * (delta / 1000), -58, 58);
+      const carefulStep = this.keys.up.isDown || this.keys.down.isDown;
+      if ((swing !== 0 || carefulStep || Phaser.Input.Keyboard.JustDown(this.keys.sweep)) && time - this.lastCaneSampleAt > 90) {
+        this.lastCaneSampleAt = time;
+        this.performCaneContact(time, 43);
+      }
+    } else {
+      this.caneAngle = Phaser.Math.Linear(this.caneAngle, 0, Math.min(1, delta / 120));
+    }
+    this.drawCane(time);
+  }
+
+  private drawCane(time: number): void {
+    this.caneGraphics.clear();
+    const direction = FACE_VECTOR[this.facing].clone().rotate(Phaser.Math.DegToRad(this.caneAngle));
+    const origin = new Phaser.Math.Vector2(this.player.x + 2, this.player.y + 4);
+    const length = time < this.tapExtensionUntil ? 48 : 38;
+    const tip = origin.clone().add(direction.scale(length));
+    this.caneGraphics.lineStyle(5, 0x171717, 1);
+    this.caneGraphics.lineBetween(origin.x, origin.y, Phaser.Math.Linear(origin.x, tip.x, 0.3), Phaser.Math.Linear(origin.y, tip.y, 0.3));
+    this.caneGraphics.lineStyle(3, 0xf1eee3, 1);
+    this.caneGraphics.lineBetween(Phaser.Math.Linear(origin.x, tip.x, 0.28), Phaser.Math.Linear(origin.y, tip.y, 0.28), tip.x, tip.y);
+    this.caneGraphics.lineStyle(3, 0xc94f44, 1);
+    this.caneGraphics.lineBetween(Phaser.Math.Linear(origin.x, tip.x, 0.68), Phaser.Math.Linear(origin.y, tip.y, 0.68), Phaser.Math.Linear(origin.x, tip.x, 0.78), Phaser.Math.Linear(origin.y, tip.y, 0.78));
+    this.caneGraphics.fillStyle(0x5d6463, 1);
+    this.caneGraphics.fillCircle(tip.x, tip.y, 2.4);
+  }
+
+  private caneTip(distance: number): Phaser.Math.Vector2 {
+    return new Phaser.Math.Vector2(this.player.x + 2, this.player.y + 4)
+      .add(FACE_VECTOR[this.facing].clone().rotate(Phaser.Math.DegToRad(this.caneAngle)).scale(distance));
+  }
+
+  private performCaneContact(time: number, distance: number): void {
+    const tip = this.caneTip(distance);
+    const surface = this.detectCaneSurface(tip);
+    const key = `${surface.kind}:${Math.round(surface.point.x / 12)}:${Math.round(surface.point.y / 12)}`;
+    if (key === this.lastContactKey && time - this.lastContactAt < 360) return;
+    this.lastContactKey = key;
+    this.lastContactAt = time;
+    this.contact = surface.label;
+    const sound = surface.kind === "guidance" || surface.kind === "decision"
+      ? "tactile"
+      : surface.kind === "metal"
+        ? "metal"
+        : surface.kind === "obstacle"
+          ? "obstacle"
+          : "stone";
+    audioDirector.caneTap(sound);
+    this.colorPulses.push({ x: surface.point.x, y: surface.point.y, radius: 42, expiresAt: time + 2000 });
+    const snapshot = getSnapshot();
+    const colorMemory = mergeColorMemory(snapshot.colorMemory, { scene: this.sceneId, x: surface.point.x, y: surface.point.y, radius: 38 }, 25);
+    if (colorMemory !== snapshot.colorMemory) patchSnapshot({ colorMemory });
+    this.onSurfaceContact(surface, time);
+  }
+
+  private detectCaneSurface(tip: Phaser.Math.Vector2): CaneSurface {
+    const decision = this.path.nodes.find((node) => node.kind === "decision" && Phaser.Math.Distance.Between(tip.x, tip.y, node.x, node.y) <= 15);
+    if (decision) return { kind: "decision", label: "4×4凸点：停下判断新的方向", point: new Phaser.Math.Vector2(decision.x, decision.y) };
+
+    for (let index = 0; index < this.path.nodes.length - 1; index += 1) {
+      const a = this.path.nodes[index];
+      const b = this.path.nodes[index + 1];
+      if (b.breakBefore) continue;
+      const projection = projectToSegment(tip, a, b);
+      if (projection.distance <= 11) return { kind: "guidance", label: "四条连续凸纹：沿纹路继续", point: projection.point };
+    }
+
+    if (this.sceneId === "old-city") {
+      const rail = projectToSegment(tip, OLD_CITY_HANDRAIL.start, OLD_CITY_HANDRAIL.end);
+      if (rail.distance <= 9) return { kind: "metal", label: "金属扶手：可靠近后按 E 握住", point: rail.point };
+      if (tip.x >= 500 && tip.y >= 190 && tip.y <= 275) return { kind: "obstacle", label: "封闭围栏：这条支路无法继续", point: tip };
+    }
+    return { kind: "stone", label: "普通石板：没有连续凸纹", point: tip };
+  }
+
+  private updateColorMasks(time: number): void {
+    this.colorPulses = this.colorPulses.filter((pulse) => pulse.expiresAt > time);
+    this.colorPersistentMask.clear();
+    this.colorPersistentMask.fillStyle(0xffffff, 1);
+    getSnapshot().colorMemory
+      .filter((point) => point.scene === this.sceneId)
+      .forEach((point) => this.colorPersistentMask.fillCircle(point.x, point.y, point.radius));
+    this.colorPulseMask.clear();
+    this.colorPulseMask.fillStyle(0xffffff, 1);
+    this.colorPulses.forEach((pulse) => this.colorPulseMask.fillCircle(pulse.x, pulse.y, pulse.radius));
+  }
+
+  private drawDirectionArrow(): void {
+    const target = OBJECTIVES[this.objectiveId].target;
+    const direction = new Phaser.Math.Vector2(target.x - this.player.x, target.y - this.player.y);
+    if (direction.lengthSq() < 4) return;
+    direction.normalize();
+    const start = new Phaser.Math.Vector2(this.player.x, this.player.y).add(direction.clone().scale(24));
+    const end = start.clone().add(direction.clone().scale(58));
+    const perpendicular = new Phaser.Math.Vector2(-direction.y, direction.x);
+    this.revealGraphics.lineStyle(4, 0xf3c85b, 0.92);
+    this.revealGraphics.lineBetween(start.x, start.y, end.x, end.y);
+    this.revealGraphics.fillStyle(0xffdd79, 1);
+    this.revealGraphics.fillTriangle(
+      end.x + direction.x * 9,
+      end.y + direction.y * 9,
+      end.x - direction.x * 6 + perpendicular.x * 7,
+      end.y - direction.y * 6 + perpendicular.y * 7,
+      end.x - direction.x * 6 - perpendicular.x * 7,
+      end.y - direction.y * 6 - perpendicular.y * 7,
+    );
+  }
+
+  private directionToObjective(): string {
+    const target = OBJECTIVES[this.objectiveId].target;
+    const dx = target.x - this.player.x;
+    const dy = target.y - this.player.y;
+    const horizontal = Math.abs(dx) > 24 ? (dx > 0 ? "右" : "左") : "";
+    const vertical = Math.abs(dy) > 24 ? (dy > 0 ? "下" : "上") : "";
+    const direction = `${vertical}${horizontal}`;
+    return direction ? `${direction}方` : "附近";
   }
 
   private distanceToRoute(): number {
@@ -351,6 +512,8 @@ abstract class WalkScene extends Phaser.Scene {
       detours: snapshot.detourScore,
       sceneLabel: SCENE_LABELS[this.sceneId],
       hintCooling: this.time.now < this.hintCooldownUntil,
+      contact: this.contact,
+      caneMode: this.caneMode,
     };
     const serialized = JSON.stringify(state);
     if (serialized !== this.previousHud) {
@@ -459,6 +622,8 @@ export class BusRideScene extends Phaser.Scene {
       detours: getSnapshot().detourScore,
       sceneLabel: SCENE_LABELS["bus-ride"],
       hintCooling: false,
+      contact: "车厢行驶中",
+      caneMode: false,
     });
     this.time.delayedCall(5200, () => this.say("车内报站：下一站，白鸽巢總站。"));
     this.time.delayedCall(10500, () => {
@@ -486,6 +651,8 @@ export class BusRideScene extends Phaser.Scene {
       detours: getSnapshot().detourScore,
       sceneLabel: SCENE_LABELS["bus-ride"],
       hintCooling: false,
+      contact: "车厢行驶中",
+      caneMode: false,
     });
   }
 
@@ -502,13 +669,14 @@ export class OldCityScene extends WalkScene {
   protected sceneId = "old-city" as const;
   protected backgroundKey = "old-city-bg";
   protected backgroundUrl = oldCityUrl;
-  protected spawn = new Phaser.Math.Vector2(326, 320);
+  protected spawn = new Phaser.Math.Vector2(330, 330);
   protected objectiveId = "follow-old-city-path";
   private railHeld = false;
   private railRevealedUntil = 0;
   private railBase!: Phaser.GameObjects.Graphics;
   private railReveal!: Phaser.GameObjects.Graphics;
   private leaving = false;
+  private deadEndFound = false;
 
   constructor() {
     super("old-city");
@@ -518,8 +686,8 @@ export class OldCityScene extends WalkScene {
     if (getSnapshot().busState === "arrived") patchSnapshot({ busState: transitionBus("arrived", "alight") });
     this.railBase = this.add.graphics().setDepth(12);
     this.railReveal = this.add.graphics().setDepth(15);
-    this.drawRail(this.railBase, 0x0b1115, 0.92);
-    this.announce("你在白鸽巢下车。沿盲道进入旧城；窄巷前需要改用扶手定位。");
+    this.drawRail(this.railBase, 0x5f6662, 0.92);
+    this.announce("你在白鸽巢下车。城市是灰色的；按住 Shift，用 A 和 D 手动摆杖，触碰过的地方会留下暖色记忆。");
   }
 
   protected getMovementInput(): Phaser.Math.Vector2 {
@@ -535,8 +703,11 @@ export class OldCityScene extends WalkScene {
 
   protected constrainMovement(current: Phaser.Math.Vector2, next: Phaser.Math.Vector2): Phaser.Math.Vector2 {
     const bounded = super.constrainMovement(current, next);
-    if (!this.railHeld) return bounded;
-    return projectToSegment(bounded, OLD_CITY_HANDRAIL.start, OLD_CITY_HANDRAIL.end).point;
+    if (this.railHeld) return projectToSegment(bounded, OLD_CITY_HANDRAIL.start, OLD_CITY_HANDRAIL.end).point;
+    const inCentralLane = bounded.x >= 180 && bounded.x <= 520 && bounded.y >= 145 && bounded.y <= 340;
+    const inUpperLane = bounded.x >= 245 && bounded.x <= 430 && bounded.y >= 40 && bounded.y <= 190;
+    const inRailPassage = bounded.x >= 370 && bounded.x <= 485 && bounded.y >= 80 && bounded.y <= 190;
+    return inCentralLane || inUpperLane || inRailPassage ? bounded : current;
   }
 
   protected suspendRouteTracking(): boolean {
@@ -546,47 +717,48 @@ export class OldCityScene extends WalkScene {
 
   protected repeatTaskText(): string {
     if (this.railHeld) return "当前任务：按 W 沿扶手前进，按 S 后退，按 E 可以松开。";
-    if (this.objectiveId === "follow-handrail") return "当前任务：横扫寻找右侧扶手，靠近后按 E 握住。";
-    return "当前任务：沿盲道前进；到点阵后停下，右侧约两步有连续扶手。";
+    if (this.objectiveId === "follow-handrail") return "当前任务：按住 Shift，用 A/D 摆杖确认金属扶手，靠近后按 E 握住。";
+    return "当前任务：用手动摆杖判断四纹和点阵；支路不对时请自己返回，Q 可显示目标方向。";
   }
 
-  protected onSweep(time: number): void {
-    this.revealRail(time);
-  }
-
-  protected onHint(time: number): void {
-    this.revealRail(time);
+  protected onSurfaceContact(surface: CaneSurface, time: number): void {
+    if (surface.kind === "metal") this.revealRail(time);
+    if (surface.kind === "obstacle" && !this.deadEndFound) {
+      this.deadEndFound = true;
+      collectMemory("old-city-bell");
+      this.announce("杖头碰到封闭围栏，脚下也没有连续凸纹。这是短支路，请转身返回刚才的点阵。");
+    }
   }
 
   protected updateInteraction(time: number): void {
     this.railReveal.clear();
     if (time < this.railRevealedUntil || this.railHeld) this.drawRail(this.railReveal, OLD_CITY_HANDRAIL.revealColor, 1);
 
-    const memory = { x: 445, y: 266 };
+    const memory = { x: 500, y: 230 };
     const nearMemory = this.isNear(memory.x, memory.y, 30) && !getSnapshot().memories.includes("old-city-bell");
     const railProjection = projectToSegment(new Phaser.Math.Vector2(this.player.x, this.player.y), OLD_CITY_HANDRAIL.start, OLD_CITY_HANDRAIL.end);
     const nearRail = railProjection.distance <= OLD_CITY_HANDRAIL.engageRadius;
-    const railVisible = import.meta.env.DEV || time < this.railRevealedUntil || this.railHeld;
+    const railVisible = time < this.railRevealedUntil || this.railHeld;
 
     this.prompt = nearMemory
       ? "E  聆听记忆回声"
       : this.railHeld
         ? "E  松开扶手"
         : nearRail
-          ? railVisible ? "E  握住扶手" : "Shift  横扫寻找扶手"
+          ? railVisible ? "E  握住扶手" : "按住 Shift，用 A/D 摆杖寻找扶手"
           : "";
 
     if (nearMemory && this.interactionPressed()) {
       collectMemory("old-city-bell");
       audioDirector.interact();
-      this.announce("记忆回声：钟声穿过窄巷，林伯笑说，会走错路也算澳门的一部分。");
+      this.announce("记忆回声：支路尽头传来钟声。林伯笑说，会走错路也算澳门的一部分。");
       return;
     }
 
     if (this.railHeld && this.interactionPressed()) {
       this.railHeld = false;
       audioDirector.interact();
-      this.announce("你松开扶手。需要时可以再次横扫并握住。");
+      this.announce("你松开扶手。需要时可以再次手动摆杖确认它的位置。");
       return;
     }
 

@@ -15,6 +15,8 @@ const EMPTY_HUD: HudState = {
   detours: 0,
   sceneLabel: "關閘 · 17路候车区",
   hintCooling: false,
+  contact: "尚未触碰到物体",
+  caneMode: false,
 };
 
 const ENDING_COPY: Record<EndingId, { title: string; body: string; quote: string }> = {
@@ -127,8 +129,8 @@ export function App() {
       "board-17": { x: 532, y: 188 },
       "find-seat": { x: 350, y: 164 },
       "ride-to-camoes": { x: 320, y: 180 },
-      "follow-old-city-path": { x: 318, y: 138 },
-      "follow-handrail": { x: 246, y: 100 },
+      "follow-old-city-path": { x: 395, y: 165 },
+      "follow-handrail": { x: 455, y: 120 },
       "request-crossing": { x: 278, y: 288 },
       "wait-crossing": { x: 278, y: 288 },
       "cross-junction": { x: 430, y: 80 },
@@ -147,7 +149,7 @@ export function App() {
           <div className="title-copy pixel-panel">
             <p className="eyebrow">A MACAU SOUND-TOUCH JOURNEY</p>
             <h1 id="game-title">声路·澳门</h1>
-            <p className="title-subtitle">沿着盲杖点亮的路，搭乘17路去赴一场旧约。</p>
+            <p className="title-subtitle">用盲杖读懂城市，搭乘17路去赴一场旧约。</p>
             <div className="title-actions">
               <button className="primary-button" onClick={beginNew}>开始新旅程</button>
               {saved && <button className="secondary-button" onClick={continueSaved}>继续：{saved.scene === "bus-stop" ? "關閘" : saved.scene === "old-city" ? "白鸽巢" : "上次检查点"}</button>}
@@ -168,11 +170,11 @@ export function App() {
               <div className="tile-copy"><strong>4×4凸点</strong><span>{TUTORIAL_LINES[1]}</span></div>
             </div>
             <div className="key-grid">
-              <span><kbd>WASD</kbd> 行走</span><span><kbd>Space</kbd> 敲击</span>
-              <span><kbd>Shift</kbd> 横扫</span><span><kbd>Q</kbd> 路线提示</span>
+              <span><kbd>WASD</kbd> 行走</span><span><kbd>Space</kbd> 精确敲击</span>
+              <span><kbd>Shift+A/D</kbd> 手动摆杖</span><span><kbd>Q</kbd> 方向指引</span>
               <span><kbd>E</kbd> 互动</span><span><kbd>H</kbd> 重复任务</span>
             </div>
-            <p className="tutorial-tip">盲道在平时接近黑色。探测后，暖黄色会沿连续路线短暂亮起。</p>
+            <p className="tutorial-tip">城市以暖灰呈现。杖头触碰处会短暂恢复完整暖色，随后留下淡彩记忆；Q只指出目标方向，不会显示整条路线。</p>
             <button className="primary-button" onClick={enterGame}>进入17路候车区</button>
           </div>
         </section>
@@ -191,9 +193,13 @@ export function App() {
             <span>记忆 {String(hud.memories).padStart(2, "0")}</span>
             <span>纠偏 {String(hud.detours).padStart(2, "0")}</span>
           </aside>
+          <aside className={`hud-contact pixel-panel ${hud.caneMode ? "is-active" : ""}`} aria-live="polite">
+            <span className="hud-label">{hud.caneMode ? "手动摆杖中 · A/D" : "最近触觉"}</span>
+            <strong>{hud.contact}</strong>
+          </aside>
           <div className="hud-controls pixel-panel" aria-label="操作提示">
-            <span><kbd>空格</kbd> 敲击</span><span><kbd>Shift</kbd> 横扫</span>
-            <span><kbd>Q</kbd> {hud.hintCooling ? "冷却" : "提示"}</span><span><kbd>E</kbd> 互动</span>
+            <span><kbd>空格</kbd> 敲击</span><span><kbd>Shift+A/D</kbd> 摆杖</span>
+            <span><kbd>Q</kbd> {hud.hintCooling ? "冷却" : "方向"}</span><span><kbd>E</kbd> 互动</span>
           </div>
           {(hud.subtitle || hud.prompt) && (
             <div className="dialogue-stack" style={{ fontSize: `${getSnapshot().settings.subtitleScale}em` }}>

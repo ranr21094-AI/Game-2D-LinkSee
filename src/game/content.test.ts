@@ -24,8 +24,9 @@ describe("tactile path definitions", () => {
 
   it("bridges the old-city tactile-path gap with the guide rail", () => {
     const oldCity = PATHS["old-city"].nodes;
+    const railStart = oldCity.find((node) => node.taskId === "follow-old-city-path");
     const railEnd = oldCity.find((node) => node.taskId === "follow-handrail");
-    expect(OLD_CITY_HANDRAIL.start).toEqual({ x: 318, y: 138 });
+    expect(railStart).toMatchObject(OLD_CITY_HANDRAIL.start);
     expect(railEnd).toMatchObject({ ...OLD_CITY_HANDRAIL.end, breakBefore: true });
   });
 

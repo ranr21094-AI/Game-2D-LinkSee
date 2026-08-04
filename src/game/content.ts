@@ -16,7 +16,7 @@ export const SCENE_LABELS: Record<SceneId, string> = {
   "bus-stop": "關閘 · 17路候车区",
   "bus-interior": "17路 · 车厢",
   "bus-ride": "17路 · 前往白鸽巢",
-  "old-city": "白鸽巢 · 澳门旧城",
+  "old-city": "白鸽巢 · 新旧城交界",
   "old-city-crossing": "旧城 · 斜向路口",
   ruins: "大三巴牌坊",
 };
@@ -51,8 +51,8 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
   "follow-old-city-path": {
     id: "follow-old-city-path",
     scene: "old-city",
-    label: "沿盲道前往窄巷扶手起点",
-    target: { x: 318, y: 138 },
+    label: "用盲杖判断凸纹，找到上坡扶手",
+    target: { x: 395, y: 165 },
     triggerRadius: 34,
     interaction: "interact",
     checkpoint: true,
@@ -61,7 +61,7 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
     id: "follow-handrail",
     scene: "old-city",
     label: "握住右侧扶手，沿扶手前进",
-    target: { x: 246, y: 100 },
+    target: { x: 455, y: 120 },
     triggerRadius: 24,
     interaction: "approach",
   },
@@ -125,14 +125,11 @@ export const PATHS: Record<Exclude<SceneId, "bus-ride">, TactilePathDefinition> 
   "old-city": {
     scene: "old-city",
     nodes: [
-      { x: 326, y: 320, kind: "guidance" },
-      { x: 326, y: 266, kind: "decision" },
-      { x: 445, y: 266, kind: "decision", taskId: "old-city-bell" },
-      { x: 445, y: 188, kind: "guidance" },
-      { x: 360, y: 188, kind: "decision" },
-      { x: 360, y: 138, kind: "guidance" },
-      { x: 318, y: 138, kind: "decision", taskId: "follow-old-city-path" },
-      { x: 246, y: 100, kind: "decision", taskId: "follow-handrail", breakBefore: true },
+      { x: 330, y: 330, kind: "guidance" },
+      { x: 330, y: 260, kind: "decision" },
+      { x: 330, y: 195, kind: "guidance" },
+      { x: 395, y: 165, kind: "decision", taskId: "follow-old-city-path" },
+      { x: 455, y: 120, kind: "decision", taskId: "follow-handrail", breakBefore: true },
     ],
   },
   "old-city-crossing": {
@@ -158,8 +155,8 @@ export const PATHS: Record<Exclude<SceneId, "bus-ride">, TactilePathDefinition> 
 export const OLD_CITY_HANDRAIL: GuideRailDefinition = {
   id: "old-city-right-rail",
   scene: "old-city",
-  start: { x: 318, y: 138 },
-  end: { x: 246, y: 100 },
+  start: { x: 395, y: 165 },
+  end: { x: 455, y: 120 },
   engageRadius: 30,
   revealColor: 0xe1b85f,
 };
@@ -176,5 +173,5 @@ export const OLD_CITY_CROSSING: CrossingDefinition = {
 export const TUTORIAL_LINES = [
   "四条凸纹表示继续前进",
   "4×4凸点表示停下探测并改变方向",
-  "空格敲击 · Shift横扫 · Q提示 · E互动",
+  "空格敲击 · 按住Shift并用A/D摆杖 · Q方向提示 · E互动",
 ];

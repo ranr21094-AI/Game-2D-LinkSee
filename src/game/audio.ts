@@ -22,15 +22,20 @@ class AudioDirector {
     oscillator.stop(now + duration);
   }
 
-  caneTap(kind: "tactile" | "stone" | "metal" = "tactile"): void {
+  caneTap(kind: "tactile" | "stone" | "metal" | "obstacle" = "tactile"): void {
     this.unlock();
-    const frequency = kind === "tactile" ? 680 : kind === "metal" ? 940 : 330;
-    this.tone(frequency, kind === "metal" ? 0.14 : 0.08, 0.08, kind === "metal" ? "triangle" : "square");
+    const frequency = kind === "tactile" ? 680 : kind === "metal" ? 940 : kind === "obstacle" ? 185 : 330;
+    this.tone(frequency, kind === "metal" ? 0.14 : kind === "obstacle" ? 0.18 : 0.08, 0.08, kind === "metal" ? "triangle" : "square");
   }
 
   sweep(): void {
     this.unlock();
     this.tone(440, 0.14, 0.05, "triangle");
+  }
+
+  footstep(): void {
+    this.unlock();
+    this.tone(145, 0.055, 0.035, "triangle");
   }
 
   hint(): void {

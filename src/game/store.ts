@@ -16,6 +16,7 @@ export function createInitialSnapshot(): GameSnapshotV2 {
     elapsedBeforeResume: 0,
     returnRequested: false,
     ending: null,
+    colorMemory: [],
     settings: {
       masterVolume: 0.72,
       effectsVolume: 0.8,
@@ -34,7 +35,12 @@ export function loadSnapshot(): GameSnapshotV2 | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<GameSnapshotV2>;
     if (parsed.version !== 1 || typeof parsed.scene !== "string" || !parsed.settings) return null;
-    snapshot = { ...createInitialSnapshot(), ...parsed, settings: { ...createInitialSnapshot().settings, ...parsed.settings } };
+    snapshot = {
+      ...createInitialSnapshot(),
+      ...parsed,
+      colorMemory: Array.isArray(parsed.colorMemory) ? parsed.colorMemory : [],
+      settings: { ...createInitialSnapshot().settings, ...parsed.settings },
+    };
     return snapshot;
   } catch {
     return null;

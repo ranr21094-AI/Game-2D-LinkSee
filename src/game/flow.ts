@@ -1,4 +1,4 @@
-import type { BusTransitState, CrossingDefinition, CrossingState, EndingId, EndingMetrics, GameSnapshotV2, SceneId, TilePoint } from "./types";
+import type { BusTransitState, ColorMemoryPoint, CrossingDefinition, CrossingState, EndingId, EndingMetrics, GameSnapshotV2, SceneId, TilePoint } from "./types";
 
 export type BusAction = "openDoor" | "board" | "sit" | "depart" | "arrive" | "alight";
 
@@ -57,6 +57,12 @@ export function determineEnding(metrics: EndingMetrics): EndingId {
   if (metrics.returnRequested) return "return";
   if (metrics.elapsedSeconds > 8 * 60 || metrics.detourScore >= 5) return "detour";
   return "reunion";
+}
+
+export function mergeColorMemory(points: ColorMemoryPoint[], next: ColorMemoryPoint, minimumDistance = 18): ColorMemoryPoint[] {
+  const existing = points.find((point) => point.scene === next.scene && Math.hypot(point.x - next.x, point.y - next.y) < minimumDistance);
+  if (existing) return points;
+  return [...points, next];
 }
 
 export function checkpointForScene(scene: SceneId): Pick<GameSnapshotV2, "scene" | "objectiveId"> {
