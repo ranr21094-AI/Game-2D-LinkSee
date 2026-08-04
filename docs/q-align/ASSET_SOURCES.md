@@ -1,34 +1,27 @@
-# AI 素材来源
+# 生产素材来源
 
-所有以下素材均由 Codex 内置 ImageGen 在本项目 M2-M4 批次生成，生成后以项目内 PNG 形式保存；洋红色背景素材使用 ImageGen 技能附带的 `remove_chroma_key.py` 转为透明 PNG。素材仅作为场景装饰，不承载触觉路径、玩家、HUD 或路线逻辑。
+当前生产构建不再加载整张场景背景或横向建筑条。道路、人行道、盲道、地面、公交、站亭、牌坊和街具由瓦片或代码绘制；位图仅用于角色、章节图和模块化建筑。
 
-| 项目素材 | 用途 | 生成预览 / 处理 |
+## ImageGen 位图
+
+| 项目素材 | 用途 | 生成与处理 |
 | --- | --- | --- |
-| `src/assets/m2-border-gate-strip.png` | 關閘候车区上方建筑条 | ImageGen 原图，保留雨夜背景并在 Phaser 中缩放为 640×108 |
-| `src/assets/m2-bus-shelter.png` | 玻璃候车亭与金属栏杆 | ImageGen 洋红抠像，去除背景后缩放为 240×120 |
-| `src/assets/m2-bus-side-states.png` | 公交车闭门/开门双状态 | ImageGen 洋红抠像，左右半幅分别代表闭门与开门 |
-| `src/assets/m2-bus-interior-strip.png` | 车厢窗带、扶手与雨夜窗景 | ImageGen 洋红抠像，去除背景后缩放为 640×72 |
-| `src/assets/m2-bus-stop-sign.png` | 站牌模板 | ImageGen 洋红抠像；17/25 数字由代码绘制，确保文字清晰 |
+| `src/assets/macau-architecture-base.png` | 建筑默认无彩灰状态 | 由本轮 ImageGen 六模块源图去绿幕、缩至 810×486 后转为灰度 |
+| `src/assets/macau-architecture-memory.png` | 触碰后的低饱和记忆状态 | 同一源图保留约 22% 色彩 |
+| `src/assets/macau-architecture-warm.png` | 触碰和终章的完整暖色状态 | ImageGen 内置模式生成；`remove_chroma_key.py` 去除统一绿色背景 |
+| `docs/q-align/macau-architecture-source.png` | 生成记录与复核源图 | 骑楼正面、转角屋、柱廊、两层住宅、低层住宅、石墙门共六个隔离模块 |
+| `src/assets/traveler-no-cane.png` | 无拐杖玩家四向精灵 | ImageGen 编辑；实时单杖由代码生成的四向像素精灵绘制 |
+| `src/assets/npc-spritesheet.png` | 两名问路 NPC | ImageGen 角色表，透明化后使用 |
+| `src/assets/chapter-map.png` | 章节过场路线图 | ImageGen 原图；当前节点和中文说明由 React 叠加 |
 
-本批次预览在生成后逐项展示并检查了构图、透明边缘和禁止元素；代码仍以瓦片和程序化文字提供可验证的游戏语义。
+本轮建筑提示约束为：雨夜暖灰澳门葡中建筑、16-bit 像素模块、3×2 独立排布、统一比例；禁止人物、车辆、HUD、路线、品牌、标牌、可读文字和整张场景背景。最终游戏只裁取独立模块，建筑不参与盲道逻辑。
 
-## M4
+## CC0 环境音
 
-| 项目素材 | 用途 | 生成预览 / 处理 |
+| 项目素材 | 场景 | 来源与许可 |
 | --- | --- | --- |
-| `src/assets/chapter-map.png` | 章节过场的澳门路线地图 | ImageGen 原图，节点与中文标签由 React 叠加 |
-| `src/assets/npc-spritesheet.png` | 卖花人、雨伞行人、老年观鸟者 NPC 表 | ImageGen 4×3 洋红抠像，去除背景后按 362×362 帧加载 |
+| `src/assets/audio/rain.ogg` | 户外雨后底噪 | OpenGameArt [Rain (loopable)](https://opengameart.org/content/rain-loopable)，Ylmir，CC0；采用包内 `1.ogg` |
+| `src/assets/audio/traffic.ogg` | 公交站、旧城道路和路口 | OpenGameArt [High traffic road sounds](https://opengameart.org/content/high-traffic-road-sounds)，IgnasD，CC0 |
+| `src/assets/audio/bus-interior.ogg` | 车厢与行驶过场 | Freesound [Interior sound of a bus](https://freesound.org/s/456833/)，florianreichelt，CC0；使用公开 OGG 预览编码 |
 
-## M3-M4 路线重构与街区房屋模块
-
-| 项目素材 | 用途 | 生成预览 / 处理 |
-| --- | --- | --- |
-| `src/assets/traveler-no-cane.png` | 无拐杖玩家四向 spritesheet；实时盲杖由代码绘制 | ImageGen 基于原玩家表做无拐杖编辑；黑色背景自动抠像并保留 RGBA |
-| `src/assets/m3-oldcity-house-left.png` | 旧城左侧澳门骑楼立面 | ImageGen 洋红抠像，透明叠加在旧城瓦片上，纯装饰 |
-| `src/assets/m3-oldcity-house-right.png` | 旧城右侧澳门骑楼立面 | ImageGen 洋红抠像，透明叠加在旧城瓦片上，纯装饰 |
-| `src/assets/m3-oldcity-arcade-corner.png` | 旧城街角与骑楼柱廊模块 | ImageGen 洋红抠像，透明叠加在旧城上方边缘，纯装饰 |
-| `src/assets/m3-crossing-corner-left.png` | 路口左侧转角房屋模块 | ImageGen 洋红抠像，透明叠加在路口边缘，纯装饰 |
-| `src/assets/m3-crossing-corner-right.png` | 路口右侧转角房屋模块 | ImageGen 洋红抠像，透明叠加在路口边缘，纯装饰 |
-| `src/assets/m4-ruins-lowrise-wall.png` | 牌坊周围低层房屋与石墙模块 | ImageGen 洋红抠像，透明叠加在牌坊场景两侧，中心留空，纯装饰 |
-
-以上六组房屋素材与无拐杖玩家素材均在接入前逐项预览，检查了暖灰雨夜像素风、透明边缘与无品牌/可读文字约束。
+三个文件均随构建离线打包；运行时解码或自动播放失败时，程序化盲杖、脚步、提示音和字幕仍可继续工作。

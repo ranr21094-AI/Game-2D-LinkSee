@@ -4,7 +4,7 @@ import { CHAPTER_NODES, OBJECTIVES, SCENE_LABELS, TUTORIAL_LINES } from "./game/
 import { destroyGame, pauseGame, resumeGame, startGame } from "./game/engine";
 import { gameEvents } from "./game/events";
 import { finishGame, getSnapshot, loadSnapshot, patchSnapshot, startNewGame } from "./game/store";
-import type { EndingId, GameSnapshotV2, HudState } from "./game/types";
+import type { EndingId, GameSettings, GameSnapshotV3, HudState } from "./game/types";
 import type { BusTransitState, SceneId } from "./game/types";
 import chapterMapUrl from "./assets/chapter-map.png";
 
@@ -47,7 +47,8 @@ export function App() {
   const [confirmReturn, setConfirmReturn] = useState(false);
   const [ending, setEnding] = useState<EndingId | null>(null);
   const [chapter, setChapter] = useState<ChapterTransition | null>(null);
-  const [saved, setSaved] = useState<GameSnapshotV2 | null>(() => loadSnapshot());
+  const [saved, setSaved] = useState<GameSnapshotV3 | null>(() => loadSnapshot());
+  const [, setSettingsRevision] = useState(0);
   const [showDevTools, setShowDevTools] = useState(import.meta.env.DEV);
   const mountRef = useRef<HTMLDivElement>(null);
   const endingCopy = useMemo(() => (ending ? ENDING_COPY[ending] : null), [ending]);
@@ -84,6 +85,24 @@ export function App() {
     return () => destroyGame();
   }, [screen]);
 
+  useEffect(() => {
+    if (screen !== "playing") return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || ending) return;
+      event.preventDefault();
+      if (paused) {
+        setConfirmReturn(false);
+        setPaused(false);
+        resumeGame();
+      } else {
+        pauseGame();
+        setPaused(true);
+      }
+    };
+    window.addEventListener("keydown", handleEscape, true);
+    return () => window.removeEventListener("keydown", handleEscape, true);
+  }, [ending, paused, screen]);
+
   const beginNew = () => {
     audioDirector.unlock();
     setEnding(null);
@@ -116,6 +135,12 @@ export function App() {
     resumeGame();
   };
 
+  const updateSetting = <K extends keyof GameSettings>(key: K, value: GameSettings[K]) => {
+    patchSnapshot({ settings: { ...getSnapshot().settings, [key]: value } });
+    audioDirector.syncSettings();
+    setSettingsRevision((revision) => revision + 1);
+  };
+
   const requestReturn = () => {
     patchSnapshot({ returnRequested: true });
     finishGame("return");
@@ -134,7 +159,8 @@ export function App() {
 
   const jumpDev = (scene: SceneId, busState: BusTransitState) => {
     sessionStorage.setItem("sound-road-dev-reveal", "hint");
-    patchSnapshot({ scene, busState, objectiveId: scene === "bus-stop" ? (busState === "doorOpen" ? "board-17" : "find-stop-sign") : scene === "bus-interior" ? "find-seat" : scene === "bus-ride" ? "ride-to-camoes" : scene === "old-city" ? "follow-old-city-path" : scene === "old-city-crossing" ? "request-crossing" : "meet-lam" });
+    const stage = scene === "bus-stop" ? (busState === "doorOpen" ? "bus-stop-sign" : "bus-stop-entry") : scene === "bus-interior" ? "bus-interior-entry" : scene === "bus-ride" ? "bus-ride" : scene === "old-city" ? "old-city-entry" : scene === "old-city-crossing" ? "crossing-approach" : "ruins-entry";
+    patchSnapshot({ scene, busState, resumeStage: stage, objectiveId: scene === "bus-stop" ? (busState === "doorOpen" ? "board-17" : "find-stop-sign") : scene === "bus-interior" ? "find-seat" : scene === "bus-ride" ? "ride-to-camoes" : scene === "old-city" ? "follow-old-city-path" : scene === "old-city-crossing" ? "request-crossing" : "meet-lam" });
     startGame("phaser-game", scene);
   };
 
@@ -177,7 +203,7 @@ export function App() {
               <div className="tile-copy"><strong>4×4凸点</strong><span>{TUTORIAL_LINES[1]}</span></div>
             </div>
             <div className="key-grid">
-              <span><kbd>WASD</kbd> 行走</span><span><kbd>Space</kbd> 一根盲杖敲击</span>
+              <span><kbd>WASD / 方向键</kbd> 行走</span><span><kbd>Space</kbd> 一根盲杖敲击</span>
               <span><kbd>Q</kbd> 方向指引</span><span><kbd>H</kbd> 重复任务</span>
               <span><kbd>F</kbd> 手机定位</span><span><kbd>E</kbd> 互动</span>
             </div>
@@ -252,8 +278,23 @@ export function App() {
             <p className="eyebrow">旅程暂停</p>
             <h2 id="pause-title">在雨声里停一会儿</h2>
             <button className="primary-button" onClick={resume}>继续行走</button>
+            <label className="setting-row">主音量
+              <input type="range" min="0" max="1" step="0.05" value={getSnapshot().settings.masterVolume} onChange={(event) => updateSetting("masterVolume", Number(event.target.value))} />
+            </label>
+            <label className="setting-row">环境音
+              <input type="range" min="0" max="1" step="0.05" value={getSnapshot().settings.ambientVolume} onChange={(event) => updateSetting("ambientVolume", Number(event.target.value))} />
+            </label>
+            <label className="setting-row">效果音
+              <input type="range" min="0" max="1" step="0.05" value={getSnapshot().settings.effectsVolume} onChange={(event) => updateSetting("effectsVolume", Number(event.target.value))} />
+            </label>
+            <label className="setting-row">对话音量
+              <input type="range" min="0" max="1" step="0.05" value={getSnapshot().settings.dialogueVolume} onChange={(event) => updateSetting("dialogueVolume", Number(event.target.value))} />
+            </label>
             <label className="setting-row">字幕大小
-              <input type="range" min="0.9" max="1.5" step="0.1" value={getSnapshot().settings.subtitleScale} onChange={(event) => { patchSnapshot({ settings: { ...getSnapshot().settings, subtitleScale: Number(event.target.value) } }); setHud({ ...hud }); }} />
+              <input type="range" min="0.9" max="1.5" step="0.1" value={getSnapshot().settings.subtitleScale} onChange={(event) => updateSetting("subtitleScale", Number(event.target.value))} />
+            </label>
+            <label className="setting-row setting-toggle">减少动态效果
+              <input type="checkbox" checked={getSnapshot().settings.reducedMotion} onChange={(event) => updateSetting("reducedMotion", event.target.checked)} />
             </label>
             {!confirmReturn ? (
               <button className="quiet-button" onClick={() => setConfirmReturn(true)}>请求帮助并结束旅程</button>

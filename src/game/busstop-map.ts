@@ -1,50 +1,60 @@
 import type { GroundTileKey } from "./ground-tiles";
-import type { TileMapDefinition } from "./tilemap";
+import { STANDARD_MOVEMENT_LEGEND, type TileMapDefinition } from "./tilemap";
 
 export const BUS_STOP_TILE_LEGEND: Record<string, GroundTileKey> = {
-  ".": "concrete",
-  "=": "paint",
-  "-": "curb",
-  "~": "asphalt",
-  "#": "wall",
+  B: "building",
+  s: "sidewalk",
+  p: "plaza",
+  c: "curb",
+  d: "drain",
+  a: "asphalt",
+  l: "lane",
+  m: "manhole",
 };
 
-const row = (fill: string, patches: Array<[number, string]> = []): string => {
-  const chars = Array.from({ length: 40 }, () => fill);
-  patches.forEach(([start, value]) => value.split("").forEach((char, index) => { if (start + index < chars.length) chars[start + index] = char; }));
+const fill = (char: string): string => char.repeat(40);
+const row = (fillChar: string, patches: Array<[number, string]> = []): string => {
+  const chars = Array.from({ length: 40 }, () => fillChar);
+  patches.forEach(([start, value]) => [...value].forEach((char, index) => { chars[start + index] = char; }));
   return chars.join("");
 };
 
-/** 關閘候车区：上方是关闸建筑边界，中段为混凝土候车平台，下方为路缘和车道。 */
 export const BUS_STOP_TILEMAP: TileMapDefinition = {
+  id: "bus-stop",
   offsetY: 4,
   legend: BUS_STOP_TILE_LEGEND,
-  rows: [
-    row("#", [[2, ".............."], [18, "......"], [27, "............."]]),
-    row("#", [[2, ".............."], [18, "......"], [27, "............."]]),
-    row("#", [[2, ".............."], [18, "......"], [27, "............."]]),
-    row("#", [[1, "......................................"]]),
-    row(".", [[0, ".."], [34, "......"]]),
-    row(".", [[0, "........................................"]]),
-    row(".", [[0, "........................................"]]),
-    row(".", [[0, "........................................"]]),
-    row(".", [[0, "........................................"]]),
-    row(".", [[0, "........................................"]]),
-    row(".", [[0, "........................................"]]),
-    row(".", [[0, "........................................"]]),
-    row(".", [[0, "........................................"]]),
-    row(".", [[0, "........................................"]]),
-    row(".", [[0, "........................................"]]),
-    row(".", [[0, "........................................"]]),
-    row(".", [[0, "........................................"]]),
-    row(".", [[0, "........................................"]]),
-    row("-", [[0, "----------------------------------------"]]),
-    row("=", [[0, "========================================"]]),
-    row("~", [[0, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"]]),
-    row("~", [[0, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"]]),
+  movementLegend: STANDARD_MOVEMENT_LEGEND,
+  groundRows: [
+    fill("B"), fill("B"), fill("B"), fill("B"), fill("B"),
+    row("s", [[3, "pppppp"], [17, "pppppp"], [31, "pppppp"]]),
+    fill("s"), fill("s"), fill("s"),
+    row("s", [[4, "p"], [14, "p"], [24, "p"], [34, "p"]]),
+    fill("s"), fill("s"),
+    row("s", [[7, "p"], [16, "p"], [28, "p"]]),
+    fill("s"), fill("s"), fill("s"),
+    row("s", [[5, "p"], [21, "p"], [36, "p"]]),
+    fill("s"),
+    fill("c"),
+    row("d", [[8, "m"], [30, "m"]]),
+    row("a", [[2, "llllll"], [20, "llllll"], [34, "llll"]]),
+    row("a", [[12, "m"], [31, "lllllll"]]),
+  ],
+  movementRows: [
+    fill("#"), fill("#"), fill("#"), fill("#"), fill("#"),
+    fill("."), fill("."), fill("."), fill("."), fill("."), fill("."), fill("."), fill("."), fill("."), fill("."), fill("."), fill("."), fill("."),
+    fill("."), fill("r"), fill("r"), fill("r"),
+  ],
+  decorations: [
+    { kind: "gate-building", x: 320, y: 100, width: 620, height: 96, depth: 3 },
+    { kind: "shelter", x: 288, y: 190, width: 260, height: 86, depth: 8 },
+    { kind: "bench", x: 112, y: 224, width: 72, height: 28, depth: 9 },
+    { kind: "bench", x: 360, y: 224, width: 72, height: 28, depth: 9 },
+    { kind: "lamp", x: 48, y: 252, width: 22, height: 86, depth: 12 },
+    { kind: "lamp", x: 592, y: 252, width: 22, height: 86, depth: 12 },
+    { kind: "bus", x: 520, y: 356, width: 208, height: 72, depth: 7 },
   ],
 };
 
-export const BUS_STOP_SIGN = { x: 250, y: 212 } as const;
-export const BUS_STOP_DECOY_SIGNS = [{ x: 402, y: 212, route: "25" }] as const;
-export const BUS_STOP_DOOR = { x: 532, y: 188 } as const;
+export const BUS_STOP_SIGN = { x: 232, y: 204 } as const;
+export const BUS_STOP_DECOY_SIGNS = [{ x: 392, y: 204, route: "25" }] as const;
+export const BUS_STOP_DOOR = { x: 488, y: 284 } as const;

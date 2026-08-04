@@ -76,11 +76,26 @@ export type EndingId = "reunion" | "detour" | "return";
 
 export type GameSettings = {
   masterVolume: number;
+  ambientVolume: number;
   effectsVolume: number;
   dialogueVolume: number;
   subtitleScale: number;
   reducedMotion: boolean;
 };
+
+export type LegacyGameSettings = Omit<GameSettings, "ambientVolume">;
+
+export type ResumeStage =
+  | "bus-stop-entry"
+  | "bus-stop-sign"
+  | "bus-interior-entry"
+  | "bus-ride"
+  | "old-city-entry"
+  | "old-city-rail"
+  | "crossing-approach"
+  | "crossing-wait"
+  | "crossing-go"
+  | "ruins-entry";
 
 export type GameSnapshotV2 = {
   version: 2;
@@ -92,6 +107,22 @@ export type GameSnapshotV2 = {
   detourScore: number;
   startedAt: number;
   elapsedBeforeResume: number;
+  returnRequested: boolean;
+  ending: EndingId | null;
+  colorMemory: ColorMemoryPoint[];
+  settings: LegacyGameSettings;
+};
+
+export type GameSnapshotV3 = {
+  version: 3;
+  objectiveId: string;
+  scene: SceneId;
+  resumeStage: ResumeStage;
+  busState: BusTransitState;
+  selectedSeatId: string | null;
+  memories: MemoryId[];
+  detourScore: number;
+  activeElapsedMs: number;
   returnRequested: boolean;
   ending: EndingId | null;
   colorMemory: ColorMemoryPoint[];

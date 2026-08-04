@@ -1,44 +1,30 @@
 import { describe, expect, it } from "vitest";
 import { PATHS } from "./content";
-import { MAP_COLS, MAP_OFFSET_Y, MAP_ROWS, MAP_TILE_SIZE, OLD_CITY_MAP, tileAt } from "./oldcity-map";
-
-const WALKABLE = new Set(["stone", "plaza", "asphalt", "dirt"]);
-
-function tileUnder(point: { x: number; y: number }): string | null {
-  const col = Math.floor(point.x / MAP_TILE_SIZE);
-  const row = Math.floor((point.y - MAP_OFFSET_Y) / MAP_TILE_SIZE);
-  return tileAt(col, row);
-}
+import { MAP_COLS, MAP_ROWS, OLD_CITY_MAP, OLD_CITY_TILEMAP, tileAt } from "./oldcity-map";
+import { isWalkable, movementAt } from "./tilemap";
 
 describe("old-city tilemap", () => {
-  it("has the expected dimensions", () => {
+  it("fills the complete 40x22 scene with ground and movement semantics", () => {
     expect(OLD_CITY_MAP).toHaveLength(MAP_ROWS);
+    expect(OLD_CITY_TILEMAP.movementRows).toHaveLength(MAP_ROWS);
     OLD_CITY_MAP.forEach((row) => expect(row).toHaveLength(MAP_COLS));
+    OLD_CITY_TILEMAP.movementRows.forEach((row) => expect(row).toHaveLength(MAP_COLS));
   });
 
   it("keeps every tactile path node on walkable ground", () => {
-    PATHS["old-city"].nodes.forEach((node) => {
-      const tile = tileUnder(node);
-      expect(tile && WALKABLE.has(tile), `node (${node.x},${node.y}) on ${tile}`).toBe(true);
-    });
+    PATHS["old-city"].nodes.forEach((node) => expect(isWalkable(OLD_CITY_TILEMAP, node), `node (${node.x},${node.y})`).toBe(true));
   });
 
-  it("keeps the spawn platform walkable", () => {
-    expect(WALKABLE.has(tileUnder({ x: 330, y: 330 }) ?? "")).toBe(true);
+  it("encloses the dirt detour with map-defined fences", () => {
+    [11, 12, 13, 14, 15, 16].forEach((row) => expect(tileAt(36, row)).toBe("fence"));
+    [31, 32, 33, 34, 35, 36].forEach((col) => expect(tileAt(col, 17)).toBe("fence"));
+    [12, 14, 16].forEach((row) => expect(tileAt(33, row)).toBe("dirt"));
   });
 
-  it("encloses the dead-end branch with fences", () => {
-    [12, 13, 14, 15, 16].forEach((row) => expect(tileAt(36, row)).toBe("fence"));
-    [32, 33, 34, 35, 36].forEach((col) => expect(tileAt(col, 17)).toBe("fence"));
-    [12, 14, 16].forEach((row) => expect(WALKABLE.has(tileAt(33, row) ?? "")).toBe(true));
-  });
-
-  it("marks the dead-end branch corridor as a dirt surface", () => {
-    [12, 13, 14, 15, 16].forEach((row) => expect(tileAt(33, row)).toBe("dirt"));
-  });
-
-  it("puts the bus stop on an asphalt road behind a curb", () => {
-    expect(OLD_CITY_MAP[19].split("").every((char) => char === "-")).toBe(true);
-    expect(OLD_CITY_MAP[21].split("").every((char) => char === "=")).toBe(true);
+  it("places a curb, drain and road below the alighting sidewalk", () => {
+    expect(tileAt(10, 18)).toBe("sidewalk");
+    expect(tileAt(10, 19)).toBe("curb");
+    expect(tileAt(10, 20)).toBe("drain");
+    expect(movementAt(OLD_CITY_TILEMAP, 10, 21)).toBe("road");
   });
 });

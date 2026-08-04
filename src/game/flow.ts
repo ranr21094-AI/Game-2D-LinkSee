@@ -1,4 +1,4 @@
-import type { BusTransitState, ColorMemoryPoint, CrossingDefinition, CrossingState, EndingId, EndingMetrics, GameSnapshotV2, SceneId, TilePoint } from "./types";
+import type { BusTransitState, ColorMemoryPoint, CrossingDefinition, CrossingState, EndingId, EndingMetrics, GameSnapshotV3, ResumeStage, TilePoint } from "./types";
 
 export type BusAction = "openDoor" | "board" | "sit" | "depart" | "arrive" | "alight";
 
@@ -72,14 +72,24 @@ export function mergeColorMemory(points: ColorMemoryPoint[], next: ColorMemoryPo
   return [...points, next];
 }
 
-export function checkpointForScene(scene: SceneId): Pick<GameSnapshotV2, "scene" | "objectiveId"> {
-  const objectiveByScene: Record<SceneId, string> = {
-    "bus-stop": "find-stop-sign",
-    "bus-interior": "find-seat",
-    "bus-ride": "ride-to-camoes",
-    "old-city": "follow-old-city-path",
-    "old-city-crossing": "request-crossing",
-    ruins: "meet-lam",
-  };
-  return { scene, objectiveId: objectiveByScene[scene] };
+const CHECKPOINTS: Record<ResumeStage, Pick<GameSnapshotV3, "scene" | "objectiveId" | "resumeStage"> & { point: TilePoint }> = {
+  "bus-stop-entry": { scene: "bus-stop", objectiveId: "find-stop-sign", resumeStage: "bus-stop-entry", point: { x: 88, y: 268 } },
+  "bus-stop-sign": { scene: "bus-stop", objectiveId: "board-17", resumeStage: "bus-stop-sign", point: { x: 232, y: 204 } },
+  "bus-interior-entry": { scene: "bus-interior", objectiveId: "find-seat", resumeStage: "bus-interior-entry", point: { x: 536, y: 316 } },
+  "bus-ride": { scene: "bus-ride", objectiveId: "ride-to-camoes", resumeStage: "bus-ride", point: { x: 320, y: 180 } },
+  "old-city-entry": { scene: "old-city", objectiveId: "follow-old-city-path", resumeStage: "old-city-entry", point: { x: 328, y: 284 } },
+  "old-city-rail": { scene: "old-city", objectiveId: "follow-handrail", resumeStage: "old-city-rail", point: { x: 408, y: 204 } },
+  "crossing-approach": { scene: "old-city-crossing", objectiveId: "request-crossing", resumeStage: "crossing-approach", point: { x: 136, y: 316 } },
+  "crossing-wait": { scene: "old-city-crossing", objectiveId: "wait-crossing", resumeStage: "crossing-wait", point: { x: 280, y: 284 } },
+  "crossing-go": { scene: "old-city-crossing", objectiveId: "cross-junction", resumeStage: "crossing-go", point: { x: 280, y: 284 } },
+  "ruins-entry": { scene: "ruins", objectiveId: "meet-lam", resumeStage: "ruins-entry", point: { x: 328, y: 284 } },
+};
+
+export function checkpointForStage(stage: ResumeStage): Pick<GameSnapshotV3, "scene" | "objectiveId" | "resumeStage"> {
+  const { point: _point, ...checkpoint } = CHECKPOINTS[stage];
+  return checkpoint;
+}
+
+export function resumePointForStage(stage: ResumeStage): TilePoint {
+  return { ...CHECKPOINTS[stage].point };
 }

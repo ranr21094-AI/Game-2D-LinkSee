@@ -1,4 +1,5 @@
 import type { SceneId, TactilePathDefinition, TilePoint } from "./types";
+import { SCENE_LABELS } from "./content";
 
 export const PHONE_COOLDOWN_MS = 6000;
 
@@ -16,5 +17,5 @@ export function describePhonePosition(sceneId: SceneId, player: TilePoint, path:
     return !best || distance < best.distance ? { node, distance } : best;
   }, null);
   const routeHint = nearest && nearest.distance <= 54 ? "你在凸纹附近" : "脚下暂时没有连续凸纹";
-  return `${sceneId}：目标在${bearingLabel(player, objective)}，${routeHint}。`;
+  return `${SCENE_LABELS[sceneId]}：目标在${bearingLabel(player, objective)}，${routeHint}。`;
 }

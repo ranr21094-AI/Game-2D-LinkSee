@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { OLD_CITY_CROSSING } from "./content";
-import { checkpointForScene, constrainCrossingPosition, determineEnding, mergeColorMemory, transitionBus, transitionCrossing } from "./flow";
+import { checkpointForStage, constrainCrossingPosition, determineEnding, mergeColorMemory, resumePointForStage, transitionBus, transitionCrossing } from "./flow";
 
 describe("bus state machine", () => {
   it("follows the seven required stages", () => {
@@ -38,16 +38,17 @@ describe("crossing state machine", () => {
   });
 
   it("restores the crossing at its safe request point", () => {
-    expect(checkpointForScene("old-city-crossing")).toEqual({ scene: "old-city-crossing", objectiveId: "request-crossing" });
+    expect(checkpointForStage("crossing-wait")).toEqual({ scene: "old-city-crossing", objectiveId: "wait-crossing", resumeStage: "crossing-wait" });
+    expect(resumePointForStage("crossing-wait")).toEqual({ x: 280, y: 284 });
   });
 
   it("blocks the roadway before permission and constrains the open crossing corridor", () => {
-    expect(constrainCrossingPosition("requested", { x: 410, y: 180 }, OLD_CITY_CROSSING)).toEqual({ x: 340, y: 258 });
+    expect(constrainCrossingPosition("requested", { x: 410, y: 180 }, OLD_CITY_CROSSING)).toEqual({ x: 320, y: 280 });
 
     const constrained = constrainCrossingPosition("walk", { x: 420, y: 260 }, OLD_CITY_CROSSING);
     expect(constrained.x).toBe(OLD_CITY_CROSSING.requestPoint.x + OLD_CITY_CROSSING.corridorWidth / 2);
     expect(constrained.y).toBe(260);
-    expect(constrainCrossingPosition("walk", { x: 278, y: 20 }, OLD_CITY_CROSSING).y).toBe(80);
+    expect(constrainCrossingPosition("walk", { x: 280, y: 20 }, OLD_CITY_CROSSING).y).toBe(108);
   });
 });
 

@@ -6,7 +6,6 @@ import { CROSSING_TILEMAP } from "./crossing-map";
 import { OLD_CITY_TILEMAP } from "./oldcity-map";
 import { RUINS_TILEMAP } from "./ruins-map";
 import { isWalkable, type TileMapDefinition } from "./tilemap";
-import type { GroundTileKey } from "./ground-tiles";
 
 describe("tactile path definitions", () => {
   it("keeps path coordinates valid and marks only intentional breaks", () => {
@@ -19,8 +18,8 @@ describe("tactile path definitions", () => {
     });
     expect(PATHS["old-city"].nodes.filter((node) => node.breakBefore)).toHaveLength(1);
     expect(PATHS["old-city-crossing"].nodes.filter((node) => node.breakBefore)).toHaveLength(1);
-    expect(PATHS["bus-stop"].nodes.filter((node) => node.breakBefore)).toHaveLength(1);
-    expect(PATHS["bus-interior"].nodes.filter((node) => node.breakBefore)).toHaveLength(1);
+    expect(PATHS["bus-stop"].nodes.filter((node) => node.breakBefore)).toHaveLength(0);
+    expect(PATHS["bus-interior"].nodes.filter((node) => node.breakBefore)).toHaveLength(0);
   });
 
   it("keeps every tactile route segment axis-aligned", () => {
@@ -40,9 +39,8 @@ describe("tactile path definitions", () => {
       "old-city-crossing": CROSSING_TILEMAP,
       ruins: RUINS_TILEMAP,
     };
-    const walkable = new Set<GroundTileKey>(["stone", "plaza", "concrete", "asphalt", "zebra", "curb", "dirt", "bus-floor"]);
     Object.entries(PATHS).forEach(([scene, path]) => {
-      path.nodes.forEach((node) => expect(isWalkable(maps[scene as keyof typeof PATHS], node, walkable), `${scene} node ${node.x},${node.y}`).toBe(true));
+      path.nodes.forEach((node) => expect(isWalkable(maps[scene as keyof typeof PATHS], node), `${scene} node ${node.x},${node.y}`).toBe(true));
     });
   });
 
@@ -70,7 +68,7 @@ describe("tactile path definitions", () => {
   it("uses the requested reveal ranges and durations", () => {
     expect(REVEAL_PROFILE.tapForwardTiles).toBe(1);
     expect(REVEAL_PROFILE.tapBackTiles).toBe(0);
-    expect(REVEAL_PROFILE.tapDurationMs).toBe(3000);
+    expect(REVEAL_PROFILE.tapDurationMs).toBe(180);
     expect(REVEAL_PROFILE.hintTiles).toBe(8);
     expect(REVEAL_PROFILE.hintDurationMs).toBe(3500);
   });

@@ -3,7 +3,7 @@ import type { CrossingDefinition, GuideRailDefinition, ObjectiveStep2D, RevealPr
 export const REVEAL_PROFILE: RevealProfile = {
   tapForwardTiles: 1,
   tapBackTiles: 0,
-  tapDurationMs: 3000,
+  tapDurationMs: 180,
   hintTiles: 8,
   hintDurationMs: 3500,
   hintCooldownMs: 4500,
@@ -17,9 +17,9 @@ export const ROUTE_BRIEFINGS: Record<"bus-stop" | "bus-interior", string> = {
   "bus-interior": "车厢信息：车门在身后，中央扶手向前延伸；左侧座位边缘有软垫和金属框，确认后按 E 坐下。",
 };
 
-export const BUS_STOP_SIGN = { x: 250, y: 212 } as const;
-export const BUS_STOP_DECOY_SIGNS = [{ x: 402, y: 212, route: "25" }] as const;
-export const BUS_SEAT_EDGE = { x: 350, y: 164 } as const;
+export const BUS_STOP_SIGN = { x: 232, y: 204 } as const;
+export const BUS_STOP_DECOY_SIGNS = [{ x: 392, y: 204, route: "25" }] as const;
+export const BUS_SEAT_EDGE = { x: 344, y: 172 } as const;
 
 export const SCENE_LABELS: Record<SceneId, string> = {
   "bus-stop": "關閘 · 17路候车区",
@@ -43,7 +43,7 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
     id: "find-stop-sign",
     scene: "bus-stop",
     label: "触碰站牌，确认17路方向",
-    target: { x: 250, y: 212 },
+    target: BUS_STOP_SIGN,
     triggerRadius: 34,
     interaction: "approach",
     checkpoint: true,
@@ -52,7 +52,7 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
     id: "board-17",
     scene: "bus-stop",
     label: "沿四纹盲道前往17路车门",
-    target: { x: 532, y: 188 },
+    target: { x: 488, y: 284 },
     triggerRadius: 35,
     interaction: "interact",
     checkpoint: true,
@@ -61,7 +61,7 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
     id: "find-seat",
     scene: "bus-interior",
     label: "沿车厢盲道寻找空座",
-    target: { x: 350, y: 164 },
+    target: BUS_SEAT_EDGE,
     triggerRadius: 34,
     interaction: "interact",
     checkpoint: true,
@@ -78,7 +78,7 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
     id: "follow-old-city-path",
     scene: "old-city",
     label: "用盲杖判断凸纹，找到上坡扶手",
-    target: { x: 395, y: 195 },
+    target: { x: 408, y: 204 },
     triggerRadius: 34,
     interaction: "interact",
     checkpoint: true,
@@ -87,7 +87,7 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
     id: "follow-handrail",
     scene: "old-city",
     label: "握住右侧扶手，沿扶手前进",
-    target: { x: 395, y: 120 },
+    target: { x: 408, y: 124 },
     triggerRadius: 24,
     interaction: "approach",
   },
@@ -95,7 +95,7 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
     id: "request-crossing",
     scene: "old-city-crossing",
     label: "到点阵处按 E 请求通行",
-    target: { x: 278, y: 288 },
+    target: { x: 280, y: 284 },
     triggerRadius: 32,
     interaction: "interact",
     checkpoint: true,
@@ -104,7 +104,7 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
     id: "wait-crossing",
     scene: "old-city-crossing",
     label: "留在路缘，等待可通行提示",
-    target: { x: 278, y: 288 },
+    target: { x: 280, y: 284 },
     triggerRadius: 32,
     interaction: "approach",
   },
@@ -112,7 +112,15 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
     id: "cross-junction",
     scene: "old-city-crossing",
     label: "沿直线斑马线通过路口，再向右转",
-    target: { x: 278, y: 80 },
+    target: { x: 280, y: 108 },
+    triggerRadius: 30,
+    interaction: "approach",
+  },
+  "leave-crossing": {
+    id: "leave-crossing",
+    scene: "old-city-crossing",
+    label: "抵达对岸后向右转，沿盲道离开路口",
+    target: { x: 520, y: 108 },
     triggerRadius: 30,
     interaction: "approach",
   },
@@ -120,7 +128,7 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
     id: "meet-lam",
     scene: "ruins",
     label: "循着台阶前的盲道，找到林伯",
-    target: { x: 240, y: 88 },
+    target: { x: 232, y: 108 },
     triggerRadius: 36,
     interaction: "interact",
     checkpoint: true,
@@ -131,52 +139,48 @@ export const PATHS: Record<Exclude<SceneId, "bus-ride">, TactilePathDefinition> 
   "bus-stop": {
     scene: "bus-stop",
     nodes: [
-      { x: 96, y: 284, kind: "guidance" },
-      { x: 250, y: 284, kind: "decision" },
-      { x: 250, y: 212, kind: "decision", taskId: "find-stop-sign" },
-      { x: 448, y: 212, kind: "guidance" },
-      { x: 532, y: 212, kind: "decision" },
-      { x: 532, y: 188, kind: "decision", taskId: "board-17", breakBefore: true },
+      { x: 88, y: 268, kind: "guidance" },
+      { x: 232, y: 268, kind: "decision" },
+      { x: 232, y: 204, kind: "decision", taskId: "find-stop-sign" },
+      { x: 488, y: 204, kind: "guidance" },
+      { x: 488, y: 284, kind: "decision", taskId: "board-17" },
     ],
   },
   "bus-interior": {
     scene: "bus-interior",
     nodes: [
-      { x: 530, y: 314, kind: "guidance" },
-      { x: 500, y: 314, kind: "guidance" },
-      { x: 500, y: 274, kind: "guidance" },
-      { x: 390, y: 274, kind: "decision" },
-      { x: 390, y: 164, kind: "guidance" },
-      { x: 350, y: 164, kind: "decision", taskId: "find-seat", breakBefore: true },
+      { x: 536, y: 316, kind: "guidance" },
+      { x: 408, y: 316, kind: "decision" },
+      { x: 408, y: 172, kind: "guidance" },
+      { x: 344, y: 172, kind: "decision", taskId: "find-seat" },
     ],
   },
   "old-city": {
     scene: "old-city",
     nodes: [
-      { x: 330, y: 330, kind: "guidance" },
-      { x: 330, y: 260, kind: "decision" },
-      { x: 330, y: 195, kind: "guidance" },
-      { x: 395, y: 195, kind: "decision", taskId: "follow-old-city-path" },
-      { x: 395, y: 120, kind: "decision", taskId: "follow-handrail", breakBefore: true },
+      { x: 328, y: 284, kind: "guidance" },
+      { x: 328, y: 204, kind: "decision" },
+      { x: 408, y: 204, kind: "decision", taskId: "follow-old-city-path" },
+      { x: 408, y: 124, kind: "decision", taskId: "follow-handrail", breakBefore: true },
     ],
   },
   "old-city-crossing": {
     scene: "old-city-crossing",
     nodes: [
-      { x: 180, y: 326, kind: "guidance" },
-      { x: 278, y: 326, kind: "guidance" },
-      { x: 278, y: 288, kind: "decision", taskId: "request-crossing" },
-      { x: 278, y: 80, kind: "decision", taskId: "cross-junction", breakBefore: true },
-      { x: 520, y: 80, kind: "guidance" },
+      { x: 136, y: 316, kind: "guidance" },
+      { x: 280, y: 316, kind: "guidance" },
+      { x: 280, y: 284, kind: "decision", taskId: "request-crossing" },
+      { x: 280, y: 108, kind: "decision", taskId: "cross-junction", breakBefore: true },
+      { x: 520, y: 108, kind: "decision", taskId: "leave-crossing" },
     ],
   },
   ruins: {
     scene: "ruins",
     nodes: [
-      { x: 326, y: 290, kind: "guidance" },
-      { x: 326, y: 186, kind: "decision" },
-      { x: 240, y: 186, kind: "guidance" },
-      { x: 240, y: 88, kind: "decision", taskId: "meet-lam" },
+      { x: 328, y: 284, kind: "guidance" },
+      { x: 328, y: 204, kind: "decision" },
+      { x: 232, y: 204, kind: "guidance" },
+      { x: 232, y: 108, kind: "decision", taskId: "meet-lam" },
     ],
   },
 };
@@ -184,17 +188,17 @@ export const PATHS: Record<Exclude<SceneId, "bus-ride">, TactilePathDefinition> 
 export const OLD_CITY_HANDRAIL: GuideRailDefinition = {
   id: "old-city-right-rail",
   scene: "old-city",
-  start: { x: 395, y: 195 },
-  end: { x: 395, y: 120 },
+  start: { x: 408, y: 204 },
+  end: { x: 408, y: 124 },
   engageRadius: 30,
   revealColor: 0xe1b85f,
 };
 
 export const OLD_CITY_CROSSING: CrossingDefinition = {
   scene: "old-city-crossing",
-  requestPoint: { x: 278, y: 288 },
-  farCurb: { x: 278, y: 80 },
-  nearSideBoundary: { maxX: 340, minY: 258 },
+  requestPoint: { x: 280, y: 284 },
+  farCurb: { x: 280, y: 108 },
+  nearSideBoundary: { maxX: 320, minY: 280 },
   corridorWidth: 48,
   waitMs: 2500,
 };
