@@ -206,7 +206,7 @@ export const OLD_CITY_CROSSING: CrossingDefinition = {
 export const TUTORIAL_LINES = [
   "四条凸纹表示继续前进",
   "4×4凸点表示停下探测并改变方向",
-  "Space 敲击单杖 · E互动 · Q方向提示 · H重复任务 · F辅助",
+  "Space 敲击单杖 · G照亮四周 · E互动 · Q方向提示 · H重复任务 · F辅助",
 ];
 
 export function composeRepeatText(contact: string, task: string): string {

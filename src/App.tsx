@@ -205,7 +205,8 @@ export function App() {
             <div className="key-grid">
               <span><kbd>WASD / 方向键</kbd> 行走</span><span><kbd>Space</kbd> 一根盲杖敲击</span>
               <span><kbd>Q</kbd> 方向指引</span><span><kbd>H</kbd> 重复任务</span>
-              <span><kbd>F</kbd> 手机定位</span><span><kbd>E</kbd> 互动</span>
+              <span><kbd>F</kbd> 手机定位</span><span><kbd>G</kbd> 照亮四周</span>
+              <span><kbd>E</kbd> 互动</span><span><kbd>Esc</kbd> 暂停</span>
             </div>
             <p className="tutorial-tip">城市以暖灰呈现。杖头触碰处会短暂恢复完整暖色，随后留下淡彩记忆；Q只指出目标方向，不会显示整条路线。</p>
             <button className="primary-button" onClick={enterGame}>进入17路候车区</button>
@@ -233,7 +234,7 @@ export function App() {
           <div className="hud-controls pixel-panel" aria-label="操作提示">
             <span><kbd>空格</kbd> 单杖敲击</span>
             <span><kbd>Q</kbd> {hud.hintCooling ? "冷却" : "方向"}</span><span><kbd>F</kbd> 手机</span>
-            <span><kbd>E</kbd> 互动</span>
+            <span><kbd>G</kbd> 照亮</span><span><kbd>E</kbd> 互动</span>
           </div>
           {(hud.subtitle || hud.prompt) && (
             <div className="dialogue-stack" style={{ fontSize: `${getSnapshot().settings.subtitleScale}em` }}>

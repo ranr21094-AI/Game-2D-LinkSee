@@ -74,6 +74,8 @@ abstract class WalkScene extends Phaser.Scene {
   protected trackDetours = true;
   protected contact = "尚未触碰到物体";
   protected phoneCooldownUntil = 0;
+  private flashCooldownUntil = 0;
+  private lastDarkHintAt = -4000;
   protected groundSprites: Array<{ sprite: Phaser.GameObjects.Image; textures: Record<GroundVisualState, string>; frames?: Record<GroundVisualState, string>; x: number; y: number; environment: boolean }> = [];
   private colorPulses: ColorPulse[] = [];
   private cachedMemorySource: ColorMemoryPoint[] | null = null;
@@ -162,7 +164,8 @@ abstract class WalkScene extends Phaser.Scene {
     this.player.setDepth(resumePoint.y + 1);
     this.player.setOrigin(0.5, 1);
     this.renderNpcs();
-    this.caneSprite = this.add.image(this.player.x + 2, this.player.y + 4, "cane-up-idle").setDepth(this.player.y + 3);
+    this.caneSprite = this.add.image(this.player.x + 2, this.player.y - 28, "cane-up-idle").setDepth(this.player.y + 3);
+    this.colorPulses.push({ x: resumePoint.x, y: resumePoint.y, radius: 60, expiresAt: this.time.now + 3200 });
     this.keys = this.input.keyboard!.addKeys({
       up: Phaser.Input.Keyboard.KeyCodes.W,
       down: Phaser.Input.Keyboard.KeyCodes.S,
@@ -173,13 +176,14 @@ abstract class WalkScene extends Phaser.Scene {
       hint: Phaser.Input.Keyboard.KeyCodes.Q,
       repeat: Phaser.Input.Keyboard.KeyCodes.H,
       phone: Phaser.Input.Keyboard.KeyCodes.F,
+      flash: Phaser.Input.Keyboard.KeyCodes.G,
       pause: Phaser.Input.Keyboard.KeyCodes.ESC,
       arrowUp: Phaser.Input.Keyboard.KeyCodes.UP,
       arrowDown: Phaser.Input.Keyboard.KeyCodes.DOWN,
       arrowLeft: Phaser.Input.Keyboard.KeyCodes.LEFT,
       arrowRight: Phaser.Input.Keyboard.KeyCodes.RIGHT,
     }) as Record<string, Phaser.Input.Keyboard.Key>;
-    this.input.keyboard?.addCapture(["SPACE", "Q", "E", "F", "UP", "DOWN", "LEFT", "RIGHT"]);
+    this.input.keyboard?.addCapture(["SPACE", "Q", "E", "F", "G", "UP", "DOWN", "LEFT", "RIGHT"]);
     if (import.meta.env.DEV) {
       this.cleanupDevEvents.push(gameEvents.on("devTeleport", (point) => {
         this.player.setPosition(point.x, point.y);
@@ -266,6 +270,7 @@ abstract class WalkScene extends Phaser.Scene {
    */
   private spawnWarmFade(pulse: ColorPulse, time: number): void {
     if (getSnapshot().settings.reducedMotion) return;
+    if (pulse.radius > 100) return;
     let spawned = 0;
     for (const tile of this.groundSprites) {
       if (spawned >= 96) break;
@@ -359,7 +364,30 @@ abstract class WalkScene extends Phaser.Scene {
   protected constrainMovement(_current: Phaser.Math.Vector2, next: Phaser.Math.Vector2): Phaser.Math.Vector2 {
     const bounded = new Phaser.Math.Vector2(Phaser.Math.Clamp(next.x, 24, 616), Phaser.Math.Clamp(next.y, 40, 340));
     const map = this.tileMap();
-    return map && !isWalkable(map, bounded) ? _current.clone() : bounded;
+    if (map && !isWalkable(map, bounded)) return _current.clone();
+    if (this.requiresBrightGround() && !this.isBrightGround(bounded)) {
+      this.onDarkGroundBlocked();
+      return _current.clone();
+    }
+    return bounded;
+  }
+
+  /** Whether this scene only allows stepping onto brightly lit (warm) ground. */
+  protected requiresBrightGround(): boolean {
+    return true;
+  }
+
+  /** A point is bright when an active color pulse covers it or the tile is forced warm. */
+  protected isBrightGround(point: Phaser.Math.Vector2): boolean {
+    if (this.colorPulses.some((pulse) => Phaser.Math.Distance.Between(point.x, point.y, pulse.x, pulse.y) <= pulse.radius)) return true;
+    return this.forceWarmForTile({ x: point.x, y: point.y, environment: false });
+  }
+
+  private onDarkGroundBlocked(): void {
+    const now = this.time.now;
+    if (now - this.lastDarkHintAt < 4000) return;
+    this.lastDarkHintAt = now;
+    this.announce("脚下太暗，看不清路面。按 Space 敲击点亮前方，或按 G 用手机照亮四周。");
   }
 
   protected suspendRouteTracking(): boolean {
@@ -500,10 +528,35 @@ abstract class WalkScene extends Phaser.Scene {
       audioDirector.hint();
       this.announce(`手机辅助：${text}`);
     }
+    if (Phaser.Input.Keyboard.JustDown(this.keys.flash) && time >= this.flashCooldownUntil) {
+      this.flashCooldownUntil = time + 8000;
+      this.performFlash(time);
+    }
     if (Phaser.Input.Keyboard.JustDown(this.keys.repeat)) {
       const text = composeRepeatText(this.contact, this.repeatTaskText());
       this.announce(text);
     }
+  }
+
+  /**
+   * G key: a brief phone-torch flash. Pushes a large short-lived color pulse so the
+   * ground around the player returns to full warm color (and becomes walkable under
+   * the bright-ground rule), plus a quick full-screen warm flash overlay.
+   */
+  private performFlash(time: number): void {
+    this.colorPulses.push({ x: this.player.x, y: this.player.y, radius: 220, expiresAt: time + 1800 });
+    audioDirector.hint();
+    this.announce("你打开手机闪光灯，暖光照亮了周围的路面。");
+    if (getSnapshot().settings.reducedMotion) return;
+    const overlay = this.add.rectangle(320, 180, 640, 360, 0xffe6b0, 0).setDepth(1000);
+    this.tweens.add({
+      targets: overlay,
+      alpha: 0.22,
+      duration: 160,
+      yoyo: true,
+      hold: 700,
+      onComplete: () => overlay.destroy(),
+    });
   }
 
   private updateReveal(time: number): void {
@@ -560,7 +613,8 @@ abstract class WalkScene extends Phaser.Scene {
   }
 
   private drawCane(time: number): void {
-    this.caneSprite.setPosition(Math.round(this.player.x + 2), Math.round(this.player.y + 4));
+    this.caneSprite.setPosition(Math.round(this.player.x + 2), Math.round(this.player.y - 28));
+    this.caneSprite.setAngle(this.facing === "right" ? 38 : this.facing === "left" ? -38 : 0);
     this.caneSprite.setTexture(`cane-${this.facing}-${time < this.tapExtensionUntil ? "tap" : "idle"}`);
   }
 
@@ -967,6 +1021,10 @@ export class OldCityScene extends WalkScene {
     return direction.scale(amount);
   }
 
+  protected requiresBrightGround(): boolean {
+    return !this.railHeld;
+  }
+
   protected constrainMovement(current: Phaser.Math.Vector2, next: Phaser.Math.Vector2): Phaser.Math.Vector2 {
     const bounded = super.constrainMovement(current, next);
     if (this.railHeld) return projectToSegment(bounded, OLD_CITY_HANDRAIL.start, OLD_CITY_HANDRAIL.end).point;
@@ -1123,6 +1181,10 @@ export class OldCityCrossingScene extends WalkScene {
     if (this.crossingState === "walk") return "当前任务：可以通行。沿垂直斑马线直行到对岸，再向右转。";
     if (this.crossingState === "crossed") return "当前任务：已经抵达对岸，请向右沿盲道离开路口。";
     return "当前任务：向前到点阵砖，按 E 请求通行。斑马线直行通过路口。";
+  }
+
+  protected requiresBrightGround(): boolean {
+    return this.crossingState === "approach" || this.crossingState === "requested";
   }
 
   protected constrainMovement(current: Phaser.Math.Vector2, next: Phaser.Math.Vector2): Phaser.Math.Vector2 {
