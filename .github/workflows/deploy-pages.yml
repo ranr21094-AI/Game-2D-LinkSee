@@ -3,7 +3,7 @@ name: Deploy 2D game to GitHub Pages
 on:
   push:
     branches:
-      - codex/2d-slice
+      - main
   workflow_dispatch:
 
 permissions:
