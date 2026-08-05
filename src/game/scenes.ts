@@ -3,12 +3,14 @@ import busWindowPanoramaUrl from "../assets/bus-window-panorama-pixel.png";
 import travelerWalkUrl from "../assets/traveler-walk.png";
 import travelerSitUrl from "../assets/traveler-sit.png";
 import travelerSitUpUrl from "../assets/traveler-sit-up.png";
+import busPassengerSitUpUrl from "../assets/bus-passenger-sit-up.png";
+import busDriverSitUrl from "../assets/bus-driver-sit.png";
 import lamUrl from "../assets/lam.png";
 import npcSpritesheetUrl from "../assets/npc-spritesheet.png";
 import { audioDirector } from "./audio";
 import { composeRepeatText, OBJECTIVES, OLD_CITY_CROSSING, OLD_CITY_HANDRAIL, PATHS, REVEAL_PROFILE, SCENE_LABELS, TACTILE_LIT_MS } from "./content";
 import { CROSSING_TILEMAP } from "./crossing-map";
-import { ensureCaneTextures, preloadEnvironmentAssets, renderBusBellDecoration, renderBusDriverDecoration, renderMapDecoration, type EnvironmentSprite } from "./environment-art";
+import { ensureCaneTextures, preloadEnvironmentAssets, renderBusBellDecoration, renderMapDecoration, type EnvironmentSprite } from "./environment-art";
 import { gameEvents } from "./events";
 import { BELL_ANNOUNCEMENT_DELAY_MS, BELL_WINDOW_MS, constrainCrossingPosition, determineEnding, mergeColorMemory, resumePointForStage, transitionBus, transitionCrossing } from "./flow";
 import { deterministicTileVariant, ensureGroundTextures, GROUND_TEXTURE, type GroundTileKey, type GroundVisualState } from "./ground-tiles";
@@ -127,6 +129,12 @@ abstract class WalkScene extends Phaser.Scene {
     }
     if (!this.textures.exists(BUS_SEATED_SPRITE_KEYS.lower)) {
       this.load.image(BUS_SEATED_SPRITE_KEYS.lower, travelerSitUpUrl);
+    }
+    if (!this.textures.exists("bus-passenger-sit-up")) {
+      this.load.image("bus-passenger-sit-up", busPassengerSitUpUrl);
+    }
+    if (!this.textures.exists("bus-driver-sit")) {
+      this.load.image("bus-driver-sit", busDriverSitUrl);
     }
     if (!this.textures.exists("npc-spritesheet")) {
       this.load.spritesheet("npc-spritesheet", npcSpritesheetUrl, { frameWidth: 362, frameHeight: 362 });
@@ -1046,11 +1054,11 @@ export class BusInteriorScene extends WalkScene {
 
   protected onSceneReady(): void {
     if (getSnapshot().busState === "doorOpen") patchSnapshot({ busState: "boarding" });
-    this.registerEnvironmentSprite(renderBusDriverDecoration(this, BUS_DRIVER_SEAT));
+    this.renderBusOccupants();
     const snapshot = getSnapshot();
     this.cardConfirmed = snapshot.objectiveId !== "find-card-reader";
     this.seatConfirmed = snapshot.objectiveId === "ring-bell" || snapshot.busState === "seated";
-    this.activeSeatSpot = BUS_SEAT_SPOTS.find((spot) => spot.id === snapshot.selectedSeatId) ?? null;
+    this.activeSeatSpot = BUS_SEAT_SPOTS.find((spot) => spot.id === snapshot.selectedSeatId && !spot.occupied) ?? null;
     const closeTip = gameEvents.on("tipClosed", (tip) => {
       if (tip.source === "bell" && tip.id === "bus-ride-access") this.finishAfterBell();
     });
@@ -1116,7 +1124,7 @@ export class BusInteriorScene extends WalkScene {
       const nearbySeat = this.activeSeatSpot ?? this.nearestSeatApproach(this.player.x, this.player.y);
       const near = this.activeSeatSpot
         ? this.isNear(this.activeSeatSpot.approach.x, this.activeSeatSpot.approach.y, 34)
-        : BUS_SEAT_SPOTS.some((spot) => this.isNear(spot.approach.x, spot.approach.y, 34));
+        : BUS_SEAT_SPOTS.some((spot) => !spot.occupied && this.isNear(spot.approach.x, spot.approach.y, 34));
       this.prompt = near ? (this.seatConfirmed ? "E  坐下" : "Space  探测座位边缘") : "自由摸索座位，Space 探测";
       if (near && this.seatConfirmed && this.interactionPressed()) this.sitDownForRide(nearbySeat);
       return;
@@ -1205,13 +1213,26 @@ export class BusInteriorScene extends WalkScene {
 
   private nearestSeatSurface(point: Phaser.Math.Vector2 | { x: number; y: number }): BusSeatSpot | null {
     return BUS_SEAT_SPOTS
+      .filter((spot) => !spot.occupied)
       .map((spot) => ({ spot, distance: Phaser.Math.Distance.Between(point.x, point.y, spot.surface.x, spot.surface.y) }))
       .filter((entry) => entry.distance <= 26)
       .sort((a, b) => a.distance - b.distance)[0]?.spot ?? null;
   }
 
+  private renderBusOccupants(): void {
+    BUS_SEAT_SPOTS.filter((spot) => spot.occupied).forEach((spot, index) => {
+      this.add.image(spot.surface.x, 276, "bus-passenger-sit-up")
+        .setOrigin(0.5, 1)
+        .setDepth(spot.surface.y + 58 + index * 0.01);
+    });
+    this.add.image(BUS_DRIVER_SEAT.x, BUS_DRIVER_SEAT.y, "bus-driver-sit")
+      .setOrigin(0.5, 1)
+      .setDepth(BUS_DRIVER_SEAT.y + 4);
+  }
+
   private nearestSeatApproach(x: number, y: number): BusSeatSpot {
     return BUS_SEAT_SPOTS
+      .filter((spot) => !spot.occupied)
       .map((spot) => ({ spot, distance: Phaser.Math.Distance.Between(x, y, spot.approach.x, spot.approach.y) }))
       .sort((a, b) => a.distance - b.distance)[0]?.spot ?? BUS_SEAT_SPOTS[3];
   }

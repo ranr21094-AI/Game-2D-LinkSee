@@ -362,6 +362,9 @@ function ensureBusModuleTextures(scene: Phaser.Scene, kind: BusModuleKey, width:
 }
 
 export function renderMapDecoration(scene: Phaser.Scene, decoration: MapDecoration): EnvironmentSprite | EnvironmentSprite[] | null {
+  // The driver seat keeps its collision footprint in the map, while the
+  // seated driver sprite is rendered by BusInteriorScene on top of it.
+  if (decoration.kind === "bus-driver-seat") return null;
   if (decoration.kind === "gate-building") {
     const columns = Math.max(1, Math.round(decoration.width / 16));
     const rows = Math.max(1, Math.round(decoration.height / 16));

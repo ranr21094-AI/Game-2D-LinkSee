@@ -21,6 +21,8 @@ describe("bus interior free-exploration map", () => {
     expect(isWalkable(BUS_INTERIOR_TILEMAP, BUS_SEAT_SURFACE)).toBe(false);
     expect(solidDecorationAt(BUS_INTERIOR_TILEMAP, BUS_SEAT_SURFACE)?.kind).toBe("bus-seat-row");
     expect(BUS_SEAT_SPOTS).toHaveLength(8);
+    expect(BUS_SEAT_SPOTS.filter((spot) => !spot.occupied)).toHaveLength(4);
+    expect(BUS_SEAT_SPOTS.filter((spot) => spot.occupied)).toHaveLength(4);
     BUS_SEAT_SPOTS.forEach((spot) => {
       expect(isWalkable(BUS_INTERIOR_TILEMAP, spot.approach), `${spot.id} approach`).toBe(true);
       expect(solidDecorationAt(BUS_INTERIOR_TILEMAP, spot.approach), `${spot.id} approach collision`).toBeNull();

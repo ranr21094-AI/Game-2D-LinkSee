@@ -25,6 +25,10 @@
 | `src/assets/traveler-sit.png` | 候车长椅坐姿玩家精灵 | 基于玩家正面像素角色生成并裁切为 64×64；运行时脚底锚定长椅中心，人物整体绘制在长椅前层 |
 | `src/assets/traveler-sit-up.png` | 公交车厢下排座椅的向上/背向坐姿玩家精灵 | 内置 ImageGen 参考 `traveler-sit.png` 生成；绿幕去除辅助处理后以 nearest-neighbor 缩至 64×64，无盲杖 |
 | `docs/q-align/traveler-sit-up-source.png` | 下排坐姿生成记录与复核源图 | 内置 ImageGen 生成的背向坐姿源图；生产资源仅保留透明像素角色，不含绿幕 |
+| `src/assets/bus-passenger-sit-up.png` | 公交车厢下排四个座位的坐姿乘客 NPC | 内置 ImageGen 生成侧向坐姿；绿幕去除、裁切并 nearest-neighbor 缩至 64×64；臀部、弯曲腿和脚点落在座面内 |
+| `docs/q-align/bus-passenger-sit-source.png` | 坐姿乘客生成记录与复核源图 | 单个暖灰雨夜像素 NPC 坐姿，无椅子、文字、品牌或 HUD |
+| `src/assets/bus-driver-sit.png` | 右下司机位坐姿 NPC | 内置 ImageGen 生成右驾侧面司机，包含驾驶座和方向盘；绿幕去除、裁切并 nearest-neighbor 缩至 64×64 |
+| `docs/q-align/bus-driver-sit-source.png` | 坐姿司机生成记录与复核源图 | 右驾侧面坐姿司机，无品牌、文字或 HUD |
 | `src/assets/sighted-guide-tutorial-pixel.png` | 口岸序章的扶盲教学三格插图（960×520） | 内置 ImageGen 参考用户提供的动作说明图，仅保留正确动作关系并改为暖灰雨夜像素风；裁去外边距、nearest-neighbor 缩放并量化为 128 色；所有中文说明由 React 叠加 |
 | `docs/q-align/sighted-guide-tutorial-source.png` | 扶盲教学图生成记录与复核源图 | 三格分别表现征求同意、盲人主动握肘、引导者领先半步并描述路缘；无图片内文字、箭头、HUD、品牌或水印 |
 | `src/assets/bus-accessibility-tip-pixel.png` | 上车前“帮助盲人乘车”公益贴士插图 | 内置 ImageGen 生成暖灰雨夜像素公交站场景；盲人持杖等车、公众主动询问、公交进站；无品牌、可读文字、水印或用户照片人物元素 |

@@ -14,4 +14,6 @@
 
 2026-08-05 公交车厢下排坐姿新增 `traveler-sit-up.png`；内置 ImageGen 参考上排坐姿生成背向/向上坐姿，绿幕去除辅助处理后以 nearest-neighbor 缩至 64×64，无盲杖。
 
+2026-08-05 公交车厢乘客和司机改用真正坐姿 NPC：新增 `bus-passenger-sit-up.png` 与 `bus-driver-sit.png`；内置 ImageGen 生成、绿幕去除并缩至 64×64，乘客落在座面内，司机包含驾驶座与方向盘。
+
 历史整图背景和 M2–M4 图片条已经从生产代码与 `src/assets/` 删除；它们不再代表当前瓦片化版本。

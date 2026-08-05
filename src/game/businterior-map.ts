@@ -61,14 +61,16 @@ export const BUS_INTERIOR_TILEMAP: TileMapDefinition = {
 export type BusSeatSpot = {
   id: string;
   row: "upper" | "lower";
+  /** Lower-row seats are occupied by passengers and cannot be selected. */
+  occupied: boolean;
   surface: { x: number; y: number };
   approach: { x: number; y: number };
   sit: { x: number; y: number };
 };
 
 export const BUS_SEAT_SPOTS: readonly BusSeatSpot[] = [
-  ...[104, 200, 296, 392].map((x, index) => ({ id: `upper-${index + 1}`, row: "upper" as const, surface: { x, y: 132 }, approach: { x, y: 148 }, sit: { x, y: 140 } })),
-  ...[104, 200, 296, 392].map((x, index) => ({ id: `lower-${index + 1}`, row: "lower" as const, surface: { x, y: 248 }, approach: { x, y: 224 }, sit: { x, y: 232 } })),
+  ...[104, 200, 296, 392].map((x, index) => ({ id: `upper-${index + 1}`, row: "upper" as const, occupied: false, surface: { x, y: 132 }, approach: { x, y: 148 }, sit: { x, y: 140 } })),
+  ...[104, 200, 296, 392].map((x, index) => ({ id: `lower-${index + 1}`, row: "lower" as const, occupied: true, surface: { x, y: 248 }, approach: { x, y: 224 }, sit: { x, y: 232 } })),
 ];
 
 /** Compatibility target used by the default objective and legacy saves. */
