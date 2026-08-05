@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { OLD_CITY_CROSSING } from "./content";
-import { checkpointForStage, COLOR_MEMORY_LIMIT, constrainCrossingPosition, determineEnding, mergeColorMemory, resumePointForStage, transitionBus, transitionCrossing } from "./flow";
+import { BELL_WINDOW_MS, checkpointForStage, COLOR_MEMORY_LIMIT, constrainCrossingPosition, determineEnding, mergeColorMemory, resumePointForStage, transitionBus, transitionCrossing } from "./flow";
 
 describe("bus state machine", () => {
+  it("keeps the free-exploration bus checkpoints explicit", () => {
+    expect(BELL_WINDOW_MS).toBe(7000);
+    expect(checkpointForStage("bus-interior-entry")).toEqual({ scene: "bus-interior", objectiveId: "find-card-reader", resumeStage: "bus-interior-entry" });
+    expect(checkpointForStage("bus-interior-seat")).toEqual({ scene: "bus-interior", objectiveId: "find-seat", resumeStage: "bus-interior-seat" });
+    expect(checkpointForStage("bus-interior-bell")).toEqual({ scene: "bus-interior", objectiveId: "ring-bell", resumeStage: "bus-interior-bell" });
+    expect(resumePointForStage("bus-interior-entry")).toEqual({ x: 536, y: 76 });
+  });
+
   it("follows the seven required stages", () => {
     let state = transitionBus("waiting", "openDoor");
     expect(state).toBe("doorOpen");

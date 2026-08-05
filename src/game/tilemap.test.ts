@@ -13,7 +13,7 @@ describe("shared tile maps", () => {
     });
     expect(tileAt(BUS_STOP_TILEMAP, 0, 0)).toBe("building");
     expect(tileUnderPoint(BUS_STOP_TILEMAP, { x: 232, y: 204 })).toBe("sidewalk");
-    expect(tileAt(BUS_INTERIOR_TILEMAP, 3, 4)).toBe("bus-seat");
+    expect(tileAt(BUS_INTERIOR_TILEMAP, 5, 4)).toBe("bus-seat");
   });
 
   it("converts a tile coordinate to a centered world point and tests walkability", () => {

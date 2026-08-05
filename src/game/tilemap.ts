@@ -18,6 +18,12 @@ export type DecorationKind =
   | "ruins-facade"
   | "bus-window"
   | "bus-pole"
+  | "bus-seat-row"
+  | "bus-driver-seat"
+  | "bus-rail"
+  | "bus-card-reader"
+  | "bus-bell"
+  | "bus-light"
   | "stop-sign-17"
   | "stop-sign-25";
 
@@ -29,6 +35,8 @@ export type MapDecoration = {
   height: number;
   depth?: number;
   flipX?: boolean;
+  /** Orientation for programmatic bus seat rendering. */
+  orientation?: "upper" | "lower" | "driver";
   /** Solid decorations block movement; the player cannot step onto their footprint. */
   solid?: boolean;
   /** Blocked strip width measured from the sprite center; defaults to width. */
@@ -45,6 +53,8 @@ export type TileMapDefinition = {
   movementLegend: Record<string, MovementTileKind>;
   decorations: MapDecoration[];
   offsetY: number;
+  /** When enabled, only temporarily illuminated ground may be entered. */
+  requiresBrightGround?: boolean;
 };
 
 export const STANDARD_MOVEMENT_LEGEND: Record<string, MovementTileKind> = {

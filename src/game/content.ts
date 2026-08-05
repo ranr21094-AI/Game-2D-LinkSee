@@ -1,5 +1,7 @@
 import busAccessibilityTipUrl from "../assets/bus-accessibility-tip-pixel.png";
+import busRideAccessTipUrl from "../assets/bus-ride-access-tip-pixel.png";
 import sightedGuideTutorialUrl from "../assets/sighted-guide-tutorial-pixel.png";
+import { BUS_BELL, BUS_CARD_READER, BUS_SEAT_EDGE } from "./businterior-map";
 import type { CrossingDefinition, GuideRailDefinition, ObjectiveStep2D, RevealProfile, SceneId, TactilePathDefinition, TipDefinition, TipId } from "./types";
 
 export const REVEAL_PROFILE: RevealProfile = {
@@ -43,14 +45,26 @@ export const TIP_DEFINITIONS: Record<TipId, TipDefinition> = {
     ],
     callout: "先问、说清楚、再陪同，不替对方做决定。",
   },
+  "bus-ride-access": {
+    id: "bus-ride-access",
+    title: "公交无障碍",
+    heading: "让公交更容易被找到",
+    summary: "刷卡机和下车按钮位置各异，可能让盲人在车内反复摸索，也可能错过下车站点。",
+    image: busRideAccessTipUrl,
+    imageAlt: "暖灰雨夜像素插图：盲人乘客在公交车内寻找刷卡机或按铃，一名公众先询问再说明位置并准备协助",
+    steps: [
+      { title: "统一位置与触感", body: "固定刷卡机和按铃的高度、位置，并提供明显的触觉与声音提示。" },
+      { title: "让信息顺手可用", body: "在一户通等常用 App 中集成乘车码与到站提醒，让刷卡与提醒成为顺手操作。" },
+      { title: "报站时说清楚", body: "说明车门、按铃位置和下车方向；公众或工作人员协助前先征得同意。" },
+    ],
+    callout: "无障碍不是让乘客记住每辆车的不同，而是让每辆车都更容易被理解。",
+  },
 };
 
 export const ROUTE_BRIEFINGS: Record<"bus-stop" | "bus-interior", string> = {
   "bus-stop": "站牌信息：17路开往白鸽巢，沿途还有一块写着25的相似站牌，请用盲杖确认17这个凸字。",
-  "bus-interior": "车厢信息：车门在身后，中央扶手向前延伸；左侧座位边缘有软垫和金属框，确认后按 E 坐下。",
+  "bus-interior": "车厢信息：上车后先摸索刷卡机，刷卡完成再找座位；白鸽巢报站后，记得在七秒内寻找按铃。",
 };
-
-export const BUS_SEAT_EDGE = { x: 344, y: 172 } as const;
 
 export const SCENE_LABELS: Record<SceneId, string> = {
   "bus-stop": "關閘 · 17路候车区",
@@ -80,12 +94,30 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
     interaction: "interact",
     checkpoint: true,
   },
+  "find-card-reader": {
+    id: "find-card-reader",
+    scene: "bus-interior",
+    label: "用盲杖摸索刷卡机，确认后按 E 刷卡",
+    target: BUS_CARD_READER,
+    triggerRadius: 30,
+    interaction: "interact",
+    checkpoint: true,
+  },
   "find-seat": {
     id: "find-seat",
     scene: "bus-interior",
-    label: "沿车厢盲道寻找空座",
+    label: "在车厢内自由摸索座位",
     target: BUS_SEAT_EDGE,
     triggerRadius: 34,
+    interaction: "interact",
+    checkpoint: true,
+  },
+  "ring-bell": {
+    id: "ring-bell",
+    scene: "bus-interior",
+    label: "白鸽巢报站后找到按铃并按 E",
+    target: BUS_BELL,
+    triggerRadius: 30,
     interaction: "interact",
     checkpoint: true,
   },
@@ -158,7 +190,7 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
   },
 };
 
-export const PATHS: Record<Exclude<SceneId, "bus-ride">, TactilePathDefinition> = {
+export const PATHS: Record<Exclude<SceneId, "bus-ride" | "bus-interior">, TactilePathDefinition> = {
   "bus-stop": {
     scene: "bus-stop",
     nodes: [
@@ -168,15 +200,6 @@ export const PATHS: Record<Exclude<SceneId, "bus-ride">, TactilePathDefinition> 
       { x: 488, y: 204, kind: "guidance" },
       { x: 488, y: 252, kind: "decision", taskId: "find-stop-sign" },
       { x: 488, y: 284, kind: "decision", taskId: "board-17" },
-    ],
-  },
-  "bus-interior": {
-    scene: "bus-interior",
-    nodes: [
-      { x: 536, y: 316, kind: "guidance" },
-      { x: 408, y: 316, kind: "decision" },
-      { x: 408, y: 172, kind: "guidance" },
-      { x: 344, y: 172, kind: "decision", taskId: "find-seat" },
     ],
   },
   "old-city": {

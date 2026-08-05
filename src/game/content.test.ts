@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { composeRepeatText, OLD_CITY_CROSSING, OLD_CITY_HANDRAIL, PATHS, REVEAL_PROFILE, TACTILE_LIT_MS, TIP_DEFINITIONS, TUTORIAL_LINES } from "./content";
-import { BUS_INTERIOR_TILEMAP } from "./businterior-map";
+import { composeRepeatText, OBJECTIVES, OLD_CITY_CROSSING, OLD_CITY_HANDRAIL, PATHS, REVEAL_PROFILE, TACTILE_LIT_MS, TIP_DEFINITIONS, TUTORIAL_LINES } from "./content";
+import { BUS_SEATED_SPRITE_KEYS } from "./businterior-map";
 import { BUS_STOP_TILEMAP } from "./busstop-map";
 import { CROSSING_TILEMAP } from "./crossing-map";
 import { OLD_CITY_TILEMAP } from "./oldcity-map";
@@ -19,7 +19,7 @@ describe("tactile path definitions", () => {
     expect(PATHS["old-city"].nodes.filter((node) => node.breakBefore)).toHaveLength(1);
     expect(PATHS["old-city-crossing"].nodes.filter((node) => node.breakBefore)).toHaveLength(1);
     expect(PATHS["bus-stop"].nodes.filter((node) => node.breakBefore)).toHaveLength(0);
-    expect(PATHS["bus-interior"].nodes.filter((node) => node.breakBefore)).toHaveLength(0);
+    expect(PATHS).not.toHaveProperty("bus-interior");
   });
 
   it("keeps every tactile route segment axis-aligned", () => {
@@ -34,7 +34,6 @@ describe("tactile path definitions", () => {
   it("places every route node on a walkable tile", () => {
     const maps: Record<keyof typeof PATHS, TileMapDefinition> = {
       "bus-stop": BUS_STOP_TILEMAP,
-      "bus-interior": BUS_INTERIOR_TILEMAP,
       "old-city": OLD_CITY_TILEMAP,
       "old-city-crossing": CROSSING_TILEMAP,
       ruins: RUINS_TILEMAP,
@@ -48,7 +47,7 @@ describe("tactile path definitions", () => {
     const decisions = Object.values(PATHS).flatMap((path) => path.nodes.filter((node) => node.kind === "decision"));
     expect(decisions.find((node) => node.taskId === "find-stop-sign")).toMatchObject({ x: 488, y: 252 });
     expect(decisions.some((node) => node.taskId === "board-17")).toBe(true);
-    expect(decisions.some((node) => node.taskId === "find-seat")).toBe(true);
+    expect(decisions.some((node) => node.taskId === "find-seat")).toBe(false);
     expect(decisions.some((node) => node.taskId === "meet-lam")).toBe(true);
   });
 
@@ -87,11 +86,19 @@ describe("tactile path definitions", () => {
   });
 
   it("defines both data-driven accessibility tips", () => {
-    expect(Object.keys(TIP_DEFINITIONS)).toEqual(["sighted-guide", "bus-access"]);
+    expect(Object.keys(TIP_DEFINITIONS)).toEqual(["sighted-guide", "bus-access", "bus-ride-access"]);
     const tip = TIP_DEFINITIONS["bus-access"];
     expect(tip.title).toBe("帮助盲人乘车");
     expect(tip.steps).toHaveLength(3);
     expect(tip.callout).toContain("先问");
     expect(tip.image).toContain("bus-accessibility-tip-pixel");
+    const rideTip = TIP_DEFINITIONS["bus-ride-access"];
+    expect(rideTip.heading).toBe("让公交更容易被找到");
+    expect(rideTip.image).toContain("bus-ride-access-tip-pixel");
+    expect(rideTip.steps).toHaveLength(3);
+    expect(rideTip.callout).toContain("每辆车都更容易被理解");
+    expect(BUS_SEATED_SPRITE_KEYS.lower).toBe("traveler-sit-up");
+    expect(OBJECTIVES["find-card-reader"].target).toEqual({ x: 488, y: 284 });
+    expect(OBJECTIVES["ring-bell"].target).toEqual({ x: 152, y: 188 });
   });
 });

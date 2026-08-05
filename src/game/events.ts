@@ -1,5 +1,8 @@
 import type { EndingId, HudState, SceneId, TipId, TilePoint } from "./types";
 
+export type TipSource = "intro" | "sidebar" | "bus-door" | "bell";
+export type TipEventPayload = { id: TipId; source: TipSource };
+
 type EventMap = {
   hud: HudState;
   pause: boolean;
@@ -10,8 +13,8 @@ type EventMap = {
   devInteract: undefined;
   devReveal: "hint";
   chapter: { from: SceneId; to: SceneId };
-  tipOpen: { id: TipId; fromIntro: boolean };
-  tipClosed: { id: TipId; fromIntro: boolean };
+  tipOpen: TipEventPayload;
+  tipClosed: TipEventPayload;
 };
 
 type Handler<T> = (payload: T) => void;

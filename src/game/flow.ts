@@ -2,6 +2,9 @@ import type { BusTransitState, ColorMemoryPoint, CrossingDefinition, CrossingSta
 
 export type BusAction = "openDoor" | "board" | "sit" | "depart" | "arrive" | "alight";
 
+export const BELL_WINDOW_MS = 7000;
+export const BELL_ANNOUNCEMENT_DELAY_MS = 1200;
+
 const BUS_TRANSITIONS: Record<BusTransitState, Partial<Record<BusAction, BusTransitState>>> = {
   waiting: { openDoor: "doorOpen" },
   doorOpen: { board: "boarding" },
@@ -79,7 +82,9 @@ export function mergeColorMemory(points: ColorMemoryPoint[], next: ColorMemoryPo
 const CHECKPOINTS: Record<ResumeStage, Pick<GameSnapshotV3, "scene" | "objectiveId" | "resumeStage"> & { point: TilePoint }> = {
   "bus-stop-entry": { scene: "bus-stop", objectiveId: "find-stop-sign", resumeStage: "bus-stop-entry", point: { x: 88, y: 268 } },
   "bus-stop-sign": { scene: "bus-stop", objectiveId: "board-17", resumeStage: "bus-stop-sign", point: { x: 232, y: 204 } },
-  "bus-interior-entry": { scene: "bus-interior", objectiveId: "find-seat", resumeStage: "bus-interior-entry", point: { x: 536, y: 316 } },
+  "bus-interior-entry": { scene: "bus-interior", objectiveId: "find-card-reader", resumeStage: "bus-interior-entry", point: { x: 536, y: 76 } },
+  "bus-interior-seat": { scene: "bus-interior", objectiveId: "find-seat", resumeStage: "bus-interior-seat", point: { x: 392, y: 148 } },
+  "bus-interior-bell": { scene: "bus-interior", objectiveId: "ring-bell", resumeStage: "bus-interior-bell", point: { x: 392, y: 148 } },
   "bus-ride": { scene: "bus-ride", objectiveId: "ride-to-camoes", resumeStage: "bus-ride", point: { x: 320, y: 180 } },
   "old-city-entry": { scene: "old-city", objectiveId: "follow-old-city-path", resumeStage: "old-city-entry", point: { x: 328, y: 284 } },
   "old-city-rail": { scene: "old-city", objectiveId: "follow-handrail", resumeStage: "old-city-rail", point: { x: 408, y: 204 } },

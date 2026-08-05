@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { audioDirector } from "./game/audio";
 import { OBJECTIVES, SCENE_LABELS, TIP_DEFINITIONS, TUTORIAL_LINES } from "./game/content";
 import { destroyGame, pauseGame, resumeGame, startGame } from "./game/engine";
-import { gameEvents } from "./game/events";
+import { gameEvents, type TipSource } from "./game/events";
 import { finishGame, getSnapshot, loadSnapshot, patchSnapshot, startNewGame } from "./game/store";
 import type { EndingId, GameSettings, GameSnapshotV3, HudState, TipId } from "./game/types";
 import type { BusTransitState, SceneId } from "./game/types";
@@ -47,7 +47,7 @@ export function App() {
   const [confirmReturn, setConfirmReturn] = useState(false);
   const [ending, setEnding] = useState<EndingId | null>(null);
   const [chapter, setChapter] = useState<ChapterTransition | null>(null);
-  const [tipModal, setTipModal] = useState<{ id: TipId; fromIntro: boolean } | null>(null);
+  const [tipModal, setTipModal] = useState<{ id: TipId; source: TipSource } | null>(null);
   const [showTipsList, setShowTipsList] = useState(false);
   const [, setTipsRevision] = useState(0);
   const [saved, setSaved] = useState<GameSnapshotV3 | null>(() => loadSnapshot());
@@ -156,7 +156,7 @@ export function App() {
     if (!getSnapshot().unlockedTips.includes(id)) return;
     setShowTipsList(false);
     pauseGame();
-    setTipModal({ id, fromIntro: false });
+    setTipModal({ id, source: "sidebar" });
   };
 
   const updateSetting = <K extends keyof GameSettings>(key: K, value: GameSettings[K]) => {
@@ -183,8 +183,8 @@ export function App() {
 
   const jumpDev = (scene: SceneId, busState: BusTransitState) => {
     sessionStorage.setItem("sound-road-dev-reveal", "hint");
-    const stage = scene === "bus-stop" ? (busState === "doorOpen" ? "bus-stop-sign" : "bus-stop-entry") : scene === "bus-interior" ? "bus-interior-entry" : scene === "bus-ride" ? "bus-ride" : scene === "old-city" ? "old-city-entry" : scene === "old-city-crossing" ? "crossing-approach" : "ruins-entry";
-    patchSnapshot({ scene, busState, resumeStage: stage, objectiveId: scene === "bus-stop" ? (busState === "doorOpen" ? "board-17" : "find-stop-sign") : scene === "bus-interior" ? "find-seat" : scene === "bus-ride" ? "ride-to-camoes" : scene === "old-city" ? "follow-old-city-path" : scene === "old-city-crossing" ? "request-crossing" : "meet-lam" });
+    const stage = scene === "bus-stop" ? (busState === "doorOpen" ? "bus-stop-sign" : "bus-stop-entry") : scene === "bus-interior" ? (busState === "seated" ? "bus-interior-bell" : "bus-interior-entry") : scene === "bus-ride" ? "bus-ride" : scene === "old-city" ? "old-city-entry" : scene === "old-city-crossing" ? "crossing-approach" : "ruins-entry";
+    patchSnapshot({ scene, busState, resumeStage: stage, objectiveId: scene === "bus-stop" ? (busState === "doorOpen" ? "board-17" : "find-stop-sign") : scene === "bus-interior" ? (busState === "seated" ? "ring-bell" : "find-card-reader") : scene === "bus-ride" ? "ride-to-camoes" : scene === "old-city" ? "follow-old-city-path" : scene === "old-city-crossing" ? "request-crossing" : "meet-lam" });
     startGame("phaser-game", scene);
   };
 
@@ -381,7 +381,7 @@ export function App() {
               {TIP_DEFINITIONS[tipModal.id].steps.map((step) => <li key={step.title}><strong>{step.title}</strong><span>{step.body}</span></li>)}
             </ol>
             <p className="mobility-guide-callout">{TIP_DEFINITIONS[tipModal.id].callout}</p>
-            <button className="primary-button" onClick={dismissTip}>{tipModal.fromIntro ? "我知道了，前往盲道起点" : "关闭贴士"}</button>
+            <button className="primary-button" onClick={dismissTip}>{tipModal.source === "intro" ? "我知道了，前往盲道起点" : "关闭贴士"}</button>
           </article>
         </div>
       )}

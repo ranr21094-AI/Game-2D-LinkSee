@@ -52,7 +52,7 @@ function flushActiveElapsed(): void {
 function migrateV2(legacy: GameSnapshotV2): GameSnapshotV3 {
   const stageByScene: Record<GameSnapshotV2["scene"], ResumeStage> = {
     "bus-stop": legacy.objectiveId === "board-17" ? "bus-stop-sign" : "bus-stop-entry",
-    "bus-interior": "bus-interior-entry",
+    "bus-interior": legacy.objectiveId === "ride-to-camoes" || legacy.busState === "seated" ? "bus-interior-bell" : legacy.objectiveId === "find-seat" ? "bus-interior-seat" : "bus-interior-entry",
     "bus-ride": "bus-ride",
     "old-city": legacy.objectiveId === "follow-handrail" ? "old-city-rail" : "old-city-entry",
     "old-city-crossing": legacy.objectiveId === "cross-junction" ? "crossing-go" : legacy.objectiveId === "wait-crossing" ? "crossing-wait" : "crossing-approach",
@@ -77,6 +77,17 @@ function migrateV2(legacy: GameSnapshotV2): GameSnapshotV3 {
   };
 }
 
+function normalizeBusInteriorResume(next: GameSnapshotV3): GameSnapshotV3 {
+  if (next.scene !== "bus-interior") return next;
+  if (next.objectiveId === "ride-to-camoes" || next.objectiveId === "ring-bell" || ["seated", "riding", "arrived"].includes(next.busState)) {
+    return { ...next, objectiveId: "ring-bell", resumeStage: "bus-interior-bell" };
+  }
+  if (next.objectiveId === "find-seat" || next.resumeStage === "bus-interior-seat") {
+    return { ...next, objectiveId: "find-seat", resumeStage: "bus-interior-seat" };
+  }
+  return { ...next, objectiveId: "find-card-reader", resumeStage: "bus-interior-entry" };
+}
+
 export function loadSnapshot(): GameSnapshotV3 | null {
   try {
     activeStartedAt = null;
@@ -84,18 +95,18 @@ export function loadSnapshot(): GameSnapshotV3 | null {
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<GameSnapshotV3>;
       if (parsed.version !== 3 || typeof parsed.scene !== "string" || !parsed.settings) return null;
-      snapshot = {
+      snapshot = normalizeBusInteriorResume({
         ...createInitialSnapshot(),
         ...parsed,
         version: 3,
         mobilityGuideSeen: Boolean(parsed.mobilityGuideSeen),
-        unlockedTips: Array.isArray(parsed.unlockedTips) ? parsed.unlockedTips.filter((id): id is TipId => id === "sighted-guide" || id === "bus-access") : [],
+        unlockedTips: Array.isArray(parsed.unlockedTips) ? parsed.unlockedTips.filter((id): id is TipId => id === "sighted-guide" || id === "bus-access" || id === "bus-ride-access") : [],
         activeElapsedMs: Number.isFinite(parsed.activeElapsedMs) ? Math.max(0, parsed.activeElapsedMs ?? 0) : 0,
         colorMemory: Array.isArray(parsed.colorMemory) ? parsed.colorMemory : [],
         memories: Array.isArray(parsed.memories) ? parsed.memories : [],
         settings: { ...DEFAULT_SETTINGS, ...parsed.settings },
-      };
-      return snapshot;
+      });
+      return persist();
     }
     const legacyRaw = localStorage.getItem(LEGACY_SAVE_KEY);
     if (!legacyRaw) return null;

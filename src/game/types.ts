@@ -4,7 +4,7 @@ export type TilePoint = { x: number; y: number };
 
 export type TactileTileKind = "guidance" | "decision";
 
-export type CaneSurfaceKind = "guidance" | "decision" | "stone" | "metal" | "obstacle" | "sign" | "seat" | "door" | "curb" | "person";
+export type CaneSurfaceKind = "guidance" | "decision" | "stone" | "metal" | "obstacle" | "sign" | "seat" | "door" | "curb" | "person" | "card-reader" | "bell";
 
 export type ColorMemoryPoint = TilePoint & {
   scene: SceneId;
@@ -73,7 +73,7 @@ export type BusTransitState =
 
 export type MemoryId = "bus-rain" | "old-city-bell" | "border-hand";
 export type EndingId = "reunion" | "detour" | "return";
-export type TipId = "sighted-guide" | "bus-access";
+export type TipId = "sighted-guide" | "bus-access" | "bus-ride-access";
 
 export type TipDefinition = {
   id: TipId;
@@ -104,6 +104,8 @@ export type ResumeStage =
   | "bus-stop-entry"
   | "bus-stop-sign"
   | "bus-interior-entry"
+  | "bus-interior-seat"
+  | "bus-interior-bell"
   | "bus-ride"
   | "old-city-entry"
   | "old-city-rail"

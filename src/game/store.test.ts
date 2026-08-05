@@ -60,6 +60,24 @@ describe("V3 game snapshot", () => {
     expect(loadSnapshot()?.unlockedTips).toEqual(["bus-access"]);
   });
 
+  it("persists the bus interior tip without duplicating it", () => {
+    unlockTip("bus-ride-access");
+    unlockTip("bus-ride-access");
+    expect(getSnapshot().unlockedTips).toEqual(["bus-ride-access"]);
+    expect(loadSnapshot()?.unlockedTips).toEqual(["bus-ride-access"]);
+  });
+
+  it("migrates old bus interior saves to the matching safe stage", () => {
+    const legacy: GameSnapshotV2 = {
+      version: 2, objectiveId: "find-seat", scene: "bus-interior", busState: "boarding", selectedSeatId: null, memories: [], detourScore: 0,
+      startedAt: 1, elapsedBeforeResume: 9000, returnRequested: false, ending: null, colorMemory: [],
+      settings: { masterVolume: 0.5, effectsVolume: 0.7, dialogueVolume: 0.8, subtitleScale: 1, reducedMotion: false },
+    };
+    localStorage.clear();
+    localStorage.setItem(LEGACY_SAVE_KEY, JSON.stringify(legacy));
+    expect(loadSnapshot()).toMatchObject({ scene: "bus-interior", objectiveId: "find-seat", resumeStage: "bus-interior-seat", activeElapsedMs: 0 });
+  });
+
   it("migrates V2 story state while discarding its broken wall-clock timer", () => {
     const legacy: GameSnapshotV2 = {
       version: 2, objectiveId: "follow-handrail", scene: "old-city", busState: "alighted", selectedSeatId: "seat-a2", memories: ["bus-rain"], detourScore: 2,

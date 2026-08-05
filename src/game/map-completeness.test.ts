@@ -8,7 +8,7 @@ import { OLD_CITY_TILEMAP } from "./oldcity-map";
 import { RUINS_TILEMAP } from "./ruins-map";
 import { movementAt, nearestSafeWalkablePoint, tileAt, validateTileMap, type TileMapDefinition } from "./tilemap";
 
-const MAPS: Record<keyof typeof PATHS, TileMapDefinition> = {
+const MAPS: Record<string, TileMapDefinition> = {
   "bus-stop": BUS_STOP_TILEMAP,
   "bus-interior": BUS_INTERIOR_TILEMAP,
   "old-city": OLD_CITY_TILEMAP,
@@ -38,7 +38,8 @@ describe("complete scene maps", () => {
 
   it("keeps route nodes and objectives outside decoration footprints", () => {
     Object.entries(MAPS).forEach(([scene, map]) => {
-      const points = [...PATHS[scene as keyof typeof PATHS].nodes, ...Object.values(OBJECTIVES).filter((objective) => objective.scene === scene && (objective.target.x || objective.target.y)).map((objective) => objective.target)];
+      const path = scene in PATHS ? PATHS[scene as keyof typeof PATHS] : null;
+      const points = [...(path?.nodes ?? []), ...Object.values(OBJECTIVES).filter((objective) => objective.scene === scene && (objective.target.x || objective.target.y)).map((objective) => objective.target)];
       map.decorations.forEach((decoration) => points.forEach((point) => {
         const covered = point.x > decoration.x - decoration.width / 2 && point.x < decoration.x + decoration.width / 2 && point.y > decoration.y - decoration.height && point.y < decoration.y;
         expect(covered, `${scene} point ${point.x},${point.y} covered by ${decoration.kind}`).toBe(false);

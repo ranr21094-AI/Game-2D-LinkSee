@@ -2,16 +2,17 @@ import Phaser from "phaser";
 import busWindowPanoramaUrl from "../assets/bus-window-panorama-pixel.png";
 import travelerWalkUrl from "../assets/traveler-walk.png";
 import travelerSitUrl from "../assets/traveler-sit.png";
+import travelerSitUpUrl from "../assets/traveler-sit-up.png";
 import lamUrl from "../assets/lam.png";
 import npcSpritesheetUrl from "../assets/npc-spritesheet.png";
 import { audioDirector } from "./audio";
 import { composeRepeatText, OBJECTIVES, OLD_CITY_CROSSING, OLD_CITY_HANDRAIL, PATHS, REVEAL_PROFILE, SCENE_LABELS, TACTILE_LIT_MS } from "./content";
 import { CROSSING_TILEMAP } from "./crossing-map";
-import { ensureCaneTextures, preloadEnvironmentAssets, renderMapDecoration, type EnvironmentSprite } from "./environment-art";
+import { ensureCaneTextures, preloadEnvironmentAssets, renderBusBellDecoration, renderBusDriverDecoration, renderMapDecoration, type EnvironmentSprite } from "./environment-art";
 import { gameEvents } from "./events";
-import { constrainCrossingPosition, determineEnding, mergeColorMemory, resumePointForStage, transitionBus, transitionCrossing } from "./flow";
+import { BELL_ANNOUNCEMENT_DELAY_MS, BELL_WINDOW_MS, constrainCrossingPosition, determineEnding, mergeColorMemory, resumePointForStage, transitionBus, transitionCrossing } from "./flow";
 import { deterministicTileVariant, ensureGroundTextures, GROUND_TEXTURE, type GroundTileKey, type GroundVisualState } from "./ground-tiles";
-import { BUS_INTERIOR_DOOR, BUS_INTERIOR_TILEMAP, BUS_SEAT_EDGE } from "./businterior-map";
+import { BUS_BELL_DETECTION_RADIUS, BUS_CARD_READER, BUS_DRIVER_SEAT, BUS_INTERIOR_DOOR, BUS_INTERIOR_TILEMAP, BUS_SEATED_SPRITE_KEYS, BUS_SEAT_SPOTS, isBusBellInRange, pickBusBellSpot, type BusBellSpot, type BusSeatSpot } from "./businterior-map";
 import { BUS_STOP_DECOY_SIGNS, BUS_STOP_DOOR, BUS_STOP_GATE_ENTRY, BUS_STOP_PATH_START, BUS_STOP_SIGN, BUS_STOP_SIGN_PROBE_RADIUS, BUS_STOP_TILEMAP } from "./busstop-map";
 import { MAP_TILE_SIZE, OLD_CITY_TILEMAP } from "./oldcity-map";
 import { NPC_DEFINITIONS, type NpcDefinition } from "./npcs";
@@ -62,6 +63,9 @@ function projectToSegment(point: Phaser.Math.Vector2, start: { x: number; y: num
 function solidSurfaceLabel(kind: MapDecoration["kind"]): string {
   if (kind === "gate-building") return "口岸墙体：实心建筑，无法穿过";
   if (kind === "bench") return "长椅边缘：实心座位，请绕行";
+  if (kind === "bus-driver-seat") return "司机座位：前方是驾驶区，请绕行";
+  if (kind === "bus-seat-row") return "座椅边缘：实心座位，请绕行";
+  if (kind === "bus-rail") return "扶杆：金属立柱，请绕行";
   if (kind === "stop-sign-17" || kind === "stop-sign-25") return "站牌立柱：金属立杆，牌面在上方";
   return "实心障碍物：请绕行";
 }
@@ -73,7 +77,7 @@ abstract class WalkScene extends Phaser.Scene {
   protected player!: Phaser.GameObjects.Sprite;
   protected revealGraphics!: Phaser.GameObjects.Graphics;
   protected caneSprite!: Phaser.GameObjects.Image;
-  protected path!: TactilePathDefinition;
+  protected path: TactilePathDefinition | null = null;
   protected facing: Facing = "up";
   protected revealMode: RevealMode = null;
   protected revealUntil = 0;
@@ -121,6 +125,9 @@ abstract class WalkScene extends Phaser.Scene {
     if (!this.textures.exists("traveler-sit")) {
       this.load.image("traveler-sit", travelerSitUrl);
     }
+    if (!this.textures.exists(BUS_SEATED_SPRITE_KEYS.lower)) {
+      this.load.image(BUS_SEATED_SPRITE_KEYS.lower, travelerSitUpUrl);
+    }
     if (!this.textures.exists("npc-spritesheet")) {
       this.load.spritesheet("npc-spritesheet", npcSpritesheetUrl, { frameWidth: 362, frameHeight: 362 });
     }
@@ -142,9 +149,9 @@ abstract class WalkScene extends Phaser.Scene {
     });
     const snapshot = getSnapshot();
     if (snapshot.scene === this.sceneId && OBJECTIVES[snapshot.objectiveId]?.scene === this.sceneId) this.objectiveId = snapshot.objectiveId;
-    this.path = PATHS[this.sceneId];
+    this.path = this.sceneId === "bus-interior" ? null : PATHS[this.sceneId];
     ensureTactileTextures(this);
-    this.tactileBricks = rasterizeTactilePath(this.path);
+    this.tactileBricks = this.path ? rasterizeTactilePath(this.path) : [];
     const rememberedPoints = getSnapshot().colorMemory.filter((point) => point.scene === this.sceneId);
     const toneVariants = [0xffffff, 0xf5f0e4, 0xece6d6, 0xf9f4ea];
     this.tactileSprites = this.tactileBricks.map((brick, index) => {
@@ -246,7 +253,7 @@ abstract class WalkScene extends Phaser.Scene {
     });
   }
 
-  private registerEnvironmentSprite(rendered: EnvironmentSprite): void {
+  protected registerEnvironmentSprite(rendered: EnvironmentSprite): void {
     this.groundSprites.push({ ...rendered, environment: true });
   }
 
@@ -395,7 +402,7 @@ abstract class WalkScene extends Phaser.Scene {
 
   /** Whether this scene only allows stepping onto brightly lit (warm) ground. */
   protected requiresBrightGround(): boolean {
-    return true;
+    return this.tileMap()?.requiresBrightGround ?? true;
   }
 
   /** A point is bright when an active color pulse covers it or the tile is forced warm. */
@@ -485,7 +492,7 @@ abstract class WalkScene extends Phaser.Scene {
     let y = input.y;
     const map = this.tileMap();
     const onRoad = map ? movementUnderPoint(map, { x: this.player.x, y: this.player.y }) === "road" : false;
-    const speed = 68 * (onRoad ? 0.4 : this.onGuidedPath() ? 1 : 0.35);
+    const speed = 68 * (onRoad ? 0.4 : !this.path ? 1 : this.onGuidedPath() ? 1 : 0.35);
     const current = new Phaser.Math.Vector2(this.player.x, this.player.y);
     const next = this.constrainMovement(current, new Phaser.Math.Vector2(
       this.player.x + x * speed * (delta / 1000),
@@ -635,7 +642,11 @@ abstract class WalkScene extends Phaser.Scene {
   }
 
   protected decisionHint(nodeIndex: number): string {
-    return describeDecisionBrick(this.path, nodeIndex);
+    return this.path ? describeDecisionBrick(this.path, nodeIndex) : "前方需要继续摸索";
+  }
+
+  protected objectiveTarget(): TilePoint {
+    return OBJECTIVES[this.objectiveId].target;
   }
 
   private updateCane(time: number, _delta: number): void {
@@ -666,7 +677,7 @@ abstract class WalkScene extends Phaser.Scene {
     this.contact = surface.label;
     const sound = surface.kind === "guidance" || surface.kind === "decision"
       ? "tactile"
-      : surface.kind === "metal" || surface.kind === "sign" || surface.kind === "door"
+      : surface.kind === "metal" || surface.kind === "sign" || surface.kind === "door" || surface.kind === "card-reader" || surface.kind === "bell"
         ? "metal"
         : surface.kind === "obstacle" || surface.kind === "person"
           ? "obstacle"
@@ -690,6 +701,16 @@ abstract class WalkScene extends Phaser.Scene {
   private detectCaneSurface(tip: Phaser.Math.Vector2): CaneSurface {
     const sceneSurface = this.detectSceneSurface(tip);
     if (sceneSurface) return sceneSurface;
+    if (!this.path) {
+      const map = this.tileMap();
+      const solid = map ? solidDecorationAt(map, tip) : null;
+      if (solid) return { kind: "obstacle", label: solidSurfaceLabel(solid.kind), point: tip };
+      const tile = map ? tileUnderPoint(map, tip) : null;
+      if (tile === "bus-seat") return { kind: "seat", label: "座位边缘：先确认软垫与金属框", point: tip };
+      if (tile === "metal-floor") return { kind: "metal", label: "车厢金属地面：材质冰凉而平整", point: tip };
+      if (tile === "wall" || tile === "building" || tile === "fence" || tile === "bush") return { kind: "obstacle", label: "前方是车厢结构：请停下并绕行", point: tip };
+      return { kind: "stone", label: tile === "bus-floor" ? "车厢地面：没有连续凸纹" : "普通车厢材质", point: tip };
+    }
     const decisionIndex = this.path.nodes.findIndex((node) => node.kind === "decision" && Phaser.Math.Distance.Between(tip.x, tip.y, node.x, node.y) <= 15);
     if (decisionIndex >= 0) {
       const node = this.path.nodes[decisionIndex];
@@ -718,7 +739,7 @@ abstract class WalkScene extends Phaser.Scene {
   }
 
   private drawDirectionArrow(): void {
-    const target = OBJECTIVES[this.objectiveId].target;
+    const target = this.objectiveTarget();
     const direction = new Phaser.Math.Vector2(target.x - this.player.x, target.y - this.player.y);
     if (direction.lengthSq() < 4) return;
     direction.normalize();
@@ -739,7 +760,7 @@ abstract class WalkScene extends Phaser.Scene {
   }
 
   private directionToObjective(): string {
-    const target = OBJECTIVES[this.objectiveId].target;
+    const target = this.objectiveTarget();
     const dx = target.x - this.player.x;
     const dy = target.y - this.player.y;
     const horizontal = Math.abs(dx) > 24 ? (dx > 0 ? "右" : "左") : "";
@@ -749,6 +770,7 @@ abstract class WalkScene extends Phaser.Scene {
   }
 
   private distanceToRoute(): number {
+    if (!this.path) return Number.POSITIVE_INFINITY;
     const point = new Phaser.Math.Vector2(this.player.x, this.player.y);
     let distance = Number.POSITIVE_INFINITY;
     for (let index = 0; index < this.path.nodes.length - 1; index += 1) {
@@ -759,7 +781,7 @@ abstract class WalkScene extends Phaser.Scene {
   }
 
   protected checkRoute(time: number): void {
-    if (!this.trackDetours || this.suspendRouteTracking()) return;
+    if (!this.trackDetours || !this.path || this.suspendRouteTracking()) return;
     const distance = this.distanceToRoute();
     if (distance <= 32) {
       this.wasOnRoute = true;
@@ -814,7 +836,7 @@ export class BusStopScene extends WalkScene {
   protected onSceneReady(): void {
     const snapshot = getSnapshot();
     const closeTip = gameEvents.on("tipClosed", (tip) => {
-      if (tip.fromIntro && tip.id === "sighted-guide") this.finishGateIntro();
+      if (tip.source === "intro" && tip.id === "sighted-guide") this.finishGateIntro();
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, closeTip);
     this.events.once(Phaser.Scenes.Events.DESTROY, closeTip);
@@ -871,7 +893,7 @@ export class BusStopScene extends WalkScene {
   }
 
   protected decisionHint(nodeIndex: number): string {
-    if (this.path.nodes[nodeIndex]?.taskId === "board-17") return "4×4凸点：17路车门在右前方，靠近后按 E";
+    if (this.path?.nodes[nodeIndex]?.taskId === "board-17") return "4×4凸点：17路车门在右前方，靠近后按 E";
     return super.decisionHint(nodeIndex);
   }
 
@@ -880,7 +902,7 @@ export class BusStopScene extends WalkScene {
       this.prompt = this.gateIntroState === "offer" ? "E  查看扶盲说明" : "";
       if (this.gateIntroState === "offer" && this.interactionPressed()) {
         unlockTip("sighted-guide");
-        gameEvents.emit("tipOpen", { id: "sighted-guide", fromIntro: true });
+        gameEvents.emit("tipOpen", { id: "sighted-guide", source: "intro" });
       }
       return;
     }
@@ -904,13 +926,13 @@ export class BusStopScene extends WalkScene {
     if (!bench && near && doorOpen && !snapshot.unlockedTips.includes("bus-access")) {
       unlockTip("bus-access");
       this.prompt = "已解锁：帮助盲人乘车";
-      gameEvents.emit("tipOpen", { id: "bus-access", fromIntro: false });
+      gameEvents.emit("tipOpen", { id: "bus-access", source: "bus-door" });
       return;
     }
     if (!bench) this.prompt = near ? (doorOpen ? "E  上车" : "请稍等车门开启") : "";
     if (near && doorOpen && this.interactionPressed()) {
       audioDirector.interact();
-      patchSnapshot({ busState: transitionBus("doorOpen", "board"), objectiveId: "find-seat", scene: "bus-interior", resumeStage: "bus-interior-entry" });
+      patchSnapshot({ busState: transitionBus("doorOpen", "board"), objectiveId: "find-card-reader", scene: "bus-interior", resumeStage: "bus-interior-entry" });
       gameEvents.emit("chapter", { from: "bus-stop", to: "bus-interior" });
       this.scene.start("bus-interior");
     }
@@ -1003,9 +1025,20 @@ export class BusStopScene extends WalkScene {
 
 export class BusInteriorScene extends WalkScene {
   protected sceneId = "bus-interior" as const;
-  protected spawn = new Phaser.Math.Vector2(536, 316);
-  protected objectiveId = "find-seat";
+  protected spawn = new Phaser.Math.Vector2(BUS_INTERIOR_DOOR.x, BUS_INTERIOR_DOOR.y);
+  protected objectiveId = "find-card-reader";
+  protected trackDetours = false;
+  private cardConfirmed = false;
+  private cardContacted = false;
   private seatConfirmed = false;
+  private bellConfirmed = false;
+  private bellReady = false;
+  private bellLate = false;
+  private bellPressed = false;
+  private bellWindowUntil = 0;
+  private activeBellSpot: BusBellSpot | null = null;
+  private activeSeatSpot: BusSeatSpot | null = null;
+  private transitioningAfterBell = false;
 
   constructor() {
     super("bus-interior");
@@ -1013,7 +1046,23 @@ export class BusInteriorScene extends WalkScene {
 
   protected onSceneReady(): void {
     if (getSnapshot().busState === "doorOpen") patchSnapshot({ busState: "boarding" });
-    this.announce("你已上车。沿车厢四纹盲道前进，用盲杖确认座位边缘后再坐下。");
+    this.registerEnvironmentSprite(renderBusDriverDecoration(this, BUS_DRIVER_SEAT));
+    const snapshot = getSnapshot();
+    this.cardConfirmed = snapshot.objectiveId !== "find-card-reader";
+    this.seatConfirmed = snapshot.objectiveId === "ring-bell" || snapshot.busState === "seated";
+    this.activeSeatSpot = BUS_SEAT_SPOTS.find((spot) => spot.id === snapshot.selectedSeatId) ?? null;
+    const closeTip = gameEvents.on("tipClosed", (tip) => {
+      if (tip.source === "bell" && tip.id === "bus-ride-access") this.finishAfterBell();
+    });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, closeTip);
+    this.events.once(Phaser.Scenes.Events.DESTROY, closeTip);
+    if (snapshot.busState === "seated" || snapshot.objectiveId === "ring-bell") {
+      this.enterSeatedState(false);
+    } else if (snapshot.objectiveId === "find-seat") {
+      this.announce("刷卡完成。车厢没有连续盲道，请自由摸索座位，听到座位边缘后按 E 坐下。");
+    } else {
+      this.announce("你已上车。车厢没有连续盲道，请自由摸索刷卡机；用 Space 确认后按 E 刷卡。");
+    }
   }
 
   protected tileMap(): TileMapDefinition | null {
@@ -1021,39 +1070,173 @@ export class BusInteriorScene extends WalkScene {
   }
 
   protected detectSceneSurface(tip: Phaser.Math.Vector2): CaneSurface | null {
-    if (Phaser.Math.Distance.Between(tip.x, tip.y, BUS_SEAT_EDGE.x, BUS_SEAT_EDGE.y) <= 24) {
-      return { kind: "seat", label: "座位边缘：软垫与金属框，可以坐下", point: new Phaser.Math.Vector2(BUS_SEAT_EDGE.x, BUS_SEAT_EDGE.y) };
+    const objective = getSnapshot().objectiveId;
+    if (objective === "find-card-reader" && Phaser.Math.Distance.Between(tip.x, tip.y, BUS_CARD_READER.x, BUS_CARD_READER.y) <= 30) {
+      return { kind: "card-reader", label: "刷卡机边缘：位置不在统一标准处，确认后按 E 刷卡", point: new Phaser.Math.Vector2(BUS_CARD_READER.x, BUS_CARD_READER.y) };
+    }
+    if (objective === "find-seat") {
+      const seat = this.nearestSeatSurface(tip);
+      if (seat) return { kind: "seat", label: "座位边缘：软垫与金属框，可以坐下", point: new Phaser.Math.Vector2(seat.surface.x, seat.surface.y) };
+    }
+    if (objective === "ring-bell" && this.bellReady && this.activeBellSpot && isBusBellInRange(this.player, this.activeBellSpot, BUS_BELL_DETECTION_RADIUS)) {
+      return { kind: "bell", label: "下车按铃：位置在空位附近，确认后按 E 按铃", point: new Phaser.Math.Vector2(this.activeBellSpot.x, this.activeBellSpot.y) };
     }
     if (Phaser.Math.Distance.Between(tip.x, tip.y, BUS_INTERIOR_DOOR.x, BUS_INTERIOR_DOOR.y) <= 22) {
-      return { kind: "door", label: "车门边缘：已经上车，沿中央盲道前进", point: new Phaser.Math.Vector2(BUS_INTERIOR_DOOR.x, BUS_INTERIOR_DOOR.y) };
+      return { kind: "door", label: "车门边缘：已经上车，车厢内没有连续盲道", point: new Phaser.Math.Vector2(BUS_INTERIOR_DOOR.x, BUS_INTERIOR_DOOR.y) };
     }
     return null;
   }
 
   protected onSurfaceContact(surface: CaneSurface): void {
-    if (surface.kind !== "seat") return;
-    this.seatConfirmed = true;
-    audioDirector.interact();
-    this.announce("座位边缘已确认：软垫和金属框就在旁边，靠近后按 E 坐下。");
-  }
-
-  protected decisionHint(nodeIndex: number): string {
-    if (this.path.nodes[nodeIndex]?.taskId === "find-seat") return "4×4凸点：空座就在旁边，可按 E 坐下";
-    return super.decisionHint(nodeIndex);
-  }
-
-  protected updateInteraction(): void {
-    const seat = OBJECTIVES[this.objectiveId];
-    const near = this.isNear(seat.target.x, seat.target.y, seat.triggerRadius);
-    const canSit = getSnapshot().busState === "boarding" && this.seatConfirmed;
-    this.prompt = near ? (canSit ? "E  坐下" : "请先用盲杖确认座位边缘") : "";
-    if (near && canSit && this.interactionPressed()) {
+    if (surface.kind === "card-reader") {
+      this.cardContacted = true;
       audioDirector.interact();
-      const seated = transitionBus(getSnapshot().busState, "sit");
-      patchSnapshot({ busState: seated, selectedSeatId: "seat-a2", objectiveId: "ride-to-camoes", scene: "bus-ride", resumeStage: "bus-ride" });
-      this.announce("你收起盲杖，在座位上坐稳。");
-      this.time.delayedCall(520, () => { gameEvents.emit("chapter", { from: "bus-interior", to: "bus-ride" }); this.scene.start("bus-ride"); });
+      this.announce("摸到刷卡机边缘：位置不在统一标准处，确认后按 E 刷卡。");
+    } else if (surface.kind === "seat") {
+      this.activeSeatSpot = this.nearestSeatSurface(surface.point) ?? this.activeSeatSpot;
+      this.seatConfirmed = true;
+      audioDirector.interact();
+      this.announce("座位边缘已确认：软垫和金属框就在旁边，靠近后按 E 坐下。");
+    } else if (surface.kind === "bell") {
+      this.bellConfirmed = true;
+      audioDirector.interact();
+      this.announce(this.bellLate ? "按铃位置已确认：刚才错过报站，但现在仍可以补按。" : "按铃位置已确认：靠近后按 E 按铃。");
     }
+  }
+
+  protected updateInteraction(time: number): void {
+    const snapshot = getSnapshot();
+    if (snapshot.objectiveId === "find-card-reader") {
+      const near = this.isNear(BUS_CARD_READER.x, BUS_CARD_READER.y, 30);
+      this.prompt = near ? (this.cardContacted ? "E  刷卡" : "Space  探测刷卡机") : "自由摸索刷卡机，Space 探测";
+      if (near && this.cardContacted && this.interactionPressed()) this.confirmCard();
+      return;
+    }
+    if (snapshot.busState === "boarding" && snapshot.objectiveId === "find-seat") {
+      const nearbySeat = this.activeSeatSpot ?? this.nearestSeatApproach(this.player.x, this.player.y);
+      const near = this.activeSeatSpot
+        ? this.isNear(this.activeSeatSpot.approach.x, this.activeSeatSpot.approach.y, 34)
+        : BUS_SEAT_SPOTS.some((spot) => this.isNear(spot.approach.x, spot.approach.y, 34));
+      this.prompt = near ? (this.seatConfirmed ? "E  坐下" : "Space  探测座位边缘") : "自由摸索座位，Space 探测";
+      if (near && this.seatConfirmed && this.interactionPressed()) this.sitDownForRide(nearbySeat);
+      return;
+    }
+    if (snapshot.busState !== "seated") {
+      this.prompt = "";
+      return;
+    }
+    if (!this.bellReady || !this.activeBellSpot) {
+      this.prompt = "等待白鸽巢报站";
+      return;
+    }
+    if (!this.bellLate && !this.bellPressed && time >= this.bellWindowUntil) {
+      this.bellLate = true;
+      this.announce("刚才错过了按铃提示。车辆会短暂停留，你仍可以补按。");
+    }
+    const near = isBusBellInRange(this.player, this.activeBellSpot, BUS_BELL_DETECTION_RADIUS);
+    this.prompt = near
+      ? (this.bellConfirmed ? (this.bellLate ? "E  按铃（补救）" : "E  按铃") : "Space  探测按铃")
+      : "自由摸索按铃，Space 探测";
+    if (near && this.bellConfirmed && this.interactionPressed()) this.pressBell();
+  }
+
+  protected controlsLocked(): boolean {
+    return super.controlsLocked() || (getSnapshot().busState === "seated" && !this.bellReady);
+  }
+
+  protected objectiveTarget(): TilePoint {
+    if (getSnapshot().objectiveId === "find-seat") {
+      const seat = this.activeSeatSpot ?? this.nearestSeatApproach(this.player.x, this.player.y);
+      return seat.approach;
+    }
+    if (getSnapshot().objectiveId === "ring-bell") {
+      return this.activeBellSpot ?? { x: this.player.x, y: this.player.y };
+    }
+    return super.objectiveTarget();
+  }
+
+  private confirmCard(): void {
+    audioDirector.interact();
+    this.cardConfirmed = true;
+    patchSnapshot({ objectiveId: "find-seat", resumeStage: "bus-interior-seat" });
+    setCheckpoint("bus-interior-seat");
+    this.announce("刷卡完成，请在车厢内自由寻找座位。");
+  }
+
+  private sitDownForRide(seat: BusSeatSpot): void {
+    audioDirector.interact();
+    const seated = transitionBus(getSnapshot().busState, "sit");
+    this.activeSeatSpot = seat;
+    patchSnapshot({ busState: seated, selectedSeatId: seat.id, objectiveId: "ring-bell", scene: "bus-interior", resumeStage: "bus-interior-bell" });
+    setCheckpoint("bus-interior-bell");
+    this.enterSeatedState(true);
+  }
+
+  private enterSeatedState(announceSit: boolean): void {
+    this.bellReady = false;
+    this.bellLate = false;
+    this.bellPressed = false;
+    this.bellConfirmed = false;
+    this.activeBellSpot = null;
+    const seat = this.activeSeatSpot ?? BUS_SEAT_SPOTS[3];
+    this.activeSeatSpot = seat;
+    this.player.setPosition(seat.sit.x, seat.sit.y);
+    if (this.player.anims.isPlaying) this.player.anims.stop();
+    this.player.setTexture(seat.row === "lower" ? BUS_SEATED_SPRITE_KEYS.lower : BUS_SEATED_SPRITE_KEYS.upper);
+    this.caneSprite.setVisible(false);
+    if (announceSit) this.announce("你坐下了。车内会在报站后给出按铃提示。");
+    this.time.delayedCall(BELL_ANNOUNCEMENT_DELAY_MS, () => this.beginBellWindow());
+  }
+
+  private beginBellWindow(): void {
+    if (getSnapshot().busState !== "seated" || this.bellPressed) return;
+    this.activeBellSpot = pickBusBellSpot();
+    const bell = renderBusBellDecoration(this, this.activeBellSpot);
+    if (bell) this.registerEnvironmentSprite(bell);
+    this.bellReady = true;
+    this.bellWindowUntil = this.time.now + BELL_WINDOW_MS;
+    const seat = this.activeSeatSpot ?? BUS_SEAT_SPOTS[3];
+    this.player.setPosition(seat.approach.x, seat.approach.y);
+    this.facing = seat.row === "upper" ? "down" : "up";
+    this.player.setTexture("traveler-walk", FACE_FRAME[this.facing]);
+    this.caneSprite.setVisible(true);
+    this.announce("车内报站：下一站，白鸽巢总站。请在七秒内按铃。");
+  }
+
+  private nearestSeatSurface(point: Phaser.Math.Vector2 | { x: number; y: number }): BusSeatSpot | null {
+    return BUS_SEAT_SPOTS
+      .map((spot) => ({ spot, distance: Phaser.Math.Distance.Between(point.x, point.y, spot.surface.x, spot.surface.y) }))
+      .filter((entry) => entry.distance <= 26)
+      .sort((a, b) => a.distance - b.distance)[0]?.spot ?? null;
+  }
+
+  private nearestSeatApproach(x: number, y: number): BusSeatSpot {
+    return BUS_SEAT_SPOTS
+      .map((spot) => ({ spot, distance: Phaser.Math.Distance.Between(x, y, spot.approach.x, spot.approach.y) }))
+      .sort((a, b) => a.distance - b.distance)[0]?.spot ?? BUS_SEAT_SPOTS[3];
+  }
+
+  private pressBell(): void {
+    if (this.bellPressed) return;
+    this.bellPressed = true;
+    audioDirector.interact();
+    this.announce("按铃已确认，车辆将在白鸽巢停靠。");
+    unlockTip("bus-ride-access");
+    gameEvents.emit("tipOpen", { id: "bus-ride-access", source: "bell" });
+  }
+
+  private finishAfterBell(): void {
+    if (!this.bellPressed || this.transitioningAfterBell) return;
+    this.transitioningAfterBell = true;
+    const riding = transitionBus(getSnapshot().busState, "depart");
+    const arrived = transitionBus(riding, "arrive");
+    const alighted = transitionBus(arrived, "alight");
+    collectMemory("bus-rain");
+    patchSnapshot({ busState: alighted, scene: "old-city", objectiveId: "follow-old-city-path", resumeStage: "old-city-entry" });
+    gameEvents.emit("chapter", { from: "bus-interior", to: "old-city" });
+    // The React tip layer resumes the paused scene immediately after emitting
+    // tipClosed. Let that resume finish before starting the next Phaser scene.
+    this.time.delayedCall(1, () => this.scene.start("old-city"));
   }
 }
 
@@ -1234,7 +1417,7 @@ export class OldCityScene extends WalkScene {
   }
 
   protected decisionHint(nodeIndex: number): string {
-    if (this.path.nodes[nodeIndex]?.taskId === "follow-old-city-path") return "4×4凸点：盲道在此暂停，右侧有金属扶手";
+    if (this.path?.nodes[nodeIndex]?.taskId === "follow-old-city-path") return "4×4凸点：盲道在此暂停，右侧有金属扶手";
     return super.decisionHint(nodeIndex);
   }
 
@@ -1360,7 +1543,7 @@ export class OldCityCrossingScene extends WalkScene {
   }
 
   protected decisionHint(nodeIndex: number): string {
-    const taskId = this.path.nodes[nodeIndex]?.taskId;
+    const taskId = this.path?.nodes[nodeIndex]?.taskId;
     if (taskId === "request-crossing") return "4×4凸点：前方是路缘，可按 E 请求通行";
     if (taskId === "cross-junction") return "4×4凸点：对岸路缘，盲道向前继续";
     if (taskId === "leave-crossing") return "4×4凸点：沿对岸人行道离开路口";
@@ -1500,7 +1683,7 @@ export class RuinsScene extends WalkScene {
   }
 
   protected decisionHint(nodeIndex: number): string {
-    if (this.path.nodes[nodeIndex]?.taskId === "meet-lam") return "4×4凸点：台阶在前，林伯在盲道尽头等你";
+    if (this.path?.nodes[nodeIndex]?.taskId === "meet-lam") return "4×4凸点：台阶在前，林伯在盲道尽头等你";
     return super.decisionHint(nodeIndex);
   }
 

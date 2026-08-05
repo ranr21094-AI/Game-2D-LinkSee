@@ -4,6 +4,7 @@ import architectureMemoryUrl from "../assets/macau-architecture-memory.png";
 import architectureWarmUrl from "../assets/macau-architecture-warm.png";
 import ruinsFacadeBaseUrl from "../assets/ruins-facade-base.png";
 import ruinsFacadeMemoryUrl from "../assets/ruins-facade-memory.png";
+import busInteriorModulesUrl from "../assets/bus-interior-modules-pixel.png";
 import ruinsFacadeWarmUrl from "../assets/ruins-facade-warm.png";
 import { TREE_TEXTURE, type GroundVisualState } from "./ground-tiles";
 import type { DecorationKind, MapDecoration } from "./tilemap";
@@ -29,7 +30,24 @@ const ARCHITECTURE_CROPS: Partial<Record<DecorationKind, Crop>> = {
   "stone-gate": { x: 495, y: 280, width: 305, height: 180 },
 };
 
-const PROGRAMMATIC_KINDS = ["shelter", "bus", "bench", "lamp", "signal", "bus-window", "bus-pole", "stop-sign-17", "stop-sign-25"] as const;
+const BUS_MODULE_CROPS = {
+  window: { x: 80, y: 72, width: 530, height: 432 },
+  rail: { x: 1206, y: 47, width: 86, height: 510 },
+  cardReader: { x: 167, y: 610, width: 192, height: 342 },
+  bell: { x: 535, y: 677, width: 141, height: 240 },
+  light: { x: 800, y: 709, width: 632, height: 147 },
+} satisfies Record<string, Crop>;
+
+type BusModuleKey = keyof typeof BUS_MODULE_CROPS;
+const BUS_MODULE_KINDS: Partial<Record<DecorationKind, BusModuleKey>> = {
+  "bus-window": "window",
+  "bus-rail": "rail",
+  "bus-card-reader": "cardReader",
+  "bus-bell": "bell",
+  "bus-light": "light",
+};
+
+const PROGRAMMATIC_KINDS = ["shelter", "bus", "bench", "lamp", "signal", "bus-window", "bus-pole", "bus-seat-row", "bus-driver-seat", "stop-sign-17", "stop-sign-25"] as const;
 type ProgrammaticKind = (typeof PROGRAMMATIC_KINDS)[number];
 
 type Palette = { stone: string; dark: string; light: string; metal: string; glow: string; red: string };
@@ -44,7 +62,60 @@ function rect(ctx: CanvasRenderingContext2D, color: string, x: number, y: number
   ctx.fillRect(Math.round(x), Math.round(y), Math.round(width), Math.round(height));
 }
 
-function drawProgrammatic(ctx: CanvasRenderingContext2D, kind: DecorationKind, width: number, height: number, state: GroundVisualState): void {
+type BusSeatOrientation = "upper" | "lower" | "driver";
+
+function drawBusSeat(ctx: CanvasRenderingContext2D, width: number, height: number, state: GroundVisualState, orientation: BusSeatOrientation): void {
+  const p = PALETTES[state];
+  ctx.clearRect(0, 0, width, height);
+  if (orientation === "driver") {
+    rect(ctx, p.dark, 3, 3, width - 6, height - 6);
+    rect(ctx, p.metal, 7, 7, width - 17, height - 14);
+    rect(ctx, p.stone, 11, 11, width - 25, height - 22);
+    rect(ctx, p.light, 13, 14, width - 29, 3);
+    rect(ctx, p.glow, width - 12, 11, 5, height - 22);
+    rect(ctx, p.dark, 8, height - 8, width - 16, 4);
+    return;
+  }
+
+  const backY = orientation === "upper" ? 3 : height - 22;
+  const cushionY = orientation === "upper" ? height - 27 : 10;
+  const cushionHeight = 18;
+  // The backrest sits against the window wall; the cushion opens toward the aisle.
+  rect(ctx, p.dark, 3, 2, width - 6, height - 4);
+  rect(ctx, p.metal, 6, backY, width - 12, 20);
+  rect(ctx, p.stone, 9, backY + 4, width - 18, 12);
+  rect(ctx, p.light, 11, backY + 5, width - 22, 2);
+  rect(ctx, p.dark, 7, cushionY, width - 14, cushionHeight);
+  rect(ctx, p.stone, 10, cushionY + 3, width - 20, cushionHeight - 7);
+  rect(ctx, p.glow, 11, orientation === "upper" ? cushionY + cushionHeight - 4 : cushionY + 2, width - 22, 2);
+  rect(ctx, p.metal, 5, 8, 3, height - 16);
+  rect(ctx, p.metal, width - 8, 8, 3, height - 16);
+  rect(ctx, p.light, 5, orientation === "upper" ? height - 7 : 4, 3, 3);
+  rect(ctx, p.light, width - 8, orientation === "upper" ? height - 7 : 4, 3, 3);
+}
+
+function drawBusDriver(ctx: CanvasRenderingContext2D, state: GroundVisualState): void {
+  const p = PALETTES[state];
+  ctx.clearRect(0, 0, 64, 64);
+  // A compact seated side profile facing the right-hand-drive console.
+  rect(ctx, p.dark, 20, 20, 22, 30);
+  rect(ctx, p.metal, 23, 24, 16, 24);
+  rect(ctx, p.stone, 25, 27, 12, 16);
+  rect(ctx, p.dark, 33, 11, 15, 15);
+  rect(ctx, p.glow, 36, 15, 10, 8);
+  rect(ctx, p.dark, 38, 11, 10, 4);
+  rect(ctx, p.light, 45, 17, 3, 3);
+  rect(ctx, p.light, 41, 22, 6, 2);
+  rect(ctx, p.dark, 39, 28, 16, 5);
+  rect(ctx, p.light, 49, 29, 8, 2);
+  rect(ctx, p.dark, 21, 45, 17, 8);
+  rect(ctx, p.metal, 26, 50, 15, 5);
+  rect(ctx, p.dark, 39, 44, 9, 10);
+  rect(ctx, p.metal, 45, 51, 12, 5);
+  rect(ctx, p.glow, 54, 29, 5, 3);
+}
+
+function drawProgrammatic(ctx: CanvasRenderingContext2D, kind: DecorationKind, width: number, height: number, state: GroundVisualState, orientation?: BusSeatOrientation): void {
   const p = PALETTES[state];
   ctx.clearRect(0, 0, width, height);
   if (kind === "shelter") {
@@ -115,6 +186,8 @@ function drawProgrammatic(ctx: CanvasRenderingContext2D, kind: DecorationKind, w
     rect(ctx, p.metal, 0, height - 13, width, 5);
   } else if (kind === "bus-pole") {
     rect(ctx, p.dark, 3, 0, 6, height); rect(ctx, p.light, 4, 0, 2, height); rect(ctx, p.dark, 0, 8, 12, 5); rect(ctx, p.dark, 0, height - 13, 12, 5);
+  } else if (kind === "bus-seat-row" || kind === "bus-driver-seat") {
+    drawBusSeat(ctx, width, height, state, kind === "bus-driver-seat" ? "driver" : (orientation ?? "upper"));
   }
 }
 
@@ -125,6 +198,7 @@ export function preloadEnvironmentAssets(scene: Phaser.Scene): void {
   if (!scene.textures.exists(RUINS_FACADE_TEXTURE.base)) scene.load.image(RUINS_FACADE_TEXTURE.base, ruinsFacadeBaseUrl);
   if (!scene.textures.exists(RUINS_FACADE_TEXTURE.memory)) scene.load.image(RUINS_FACADE_TEXTURE.memory, ruinsFacadeMemoryUrl);
   if (!scene.textures.exists(RUINS_FACADE_TEXTURE.warm)) scene.load.image(RUINS_FACADE_TEXTURE.warm, ruinsFacadeWarmUrl);
+  if (!scene.textures.exists("bus-interior-modules")) scene.load.image("bus-interior-modules", busInteriorModulesUrl);
 }
 
 const STATES: GroundVisualState[] = ["base", "memory", "warm"];
@@ -139,15 +213,30 @@ function fitSize(sourceWidth: number, sourceHeight: number, maxWidth: number, ma
 }
 
 /** Programmatic sprites are drawn at their exact display size so nothing is stretched. */
-function ensureProgrammaticTextures(scene: Phaser.Scene, kind: ProgrammaticKind, width: number, height: number): Record<GroundVisualState, string> {
+function ensureProgrammaticTextures(scene: Phaser.Scene, kind: ProgrammaticKind, width: number, height: number, orientation?: BusSeatOrientation): Record<GroundVisualState, string> {
   const textures = {} as Record<GroundVisualState, string>;
   STATES.forEach((state) => {
-    const key = `environment-${kind}-${state}-${width}x${height}`;
+    const orientationKey = orientation ?? "none";
+    const key = `environment-${kind}-${orientationKey}-${state}-${width}x${height}`;
     textures[state] = key;
     if (scene.textures.exists(key)) return;
     const texture = scene.textures.createCanvas(key, width, height);
     if (!texture) return;
-    drawProgrammatic(texture.getContext(), kind, width, height, state);
+    drawProgrammatic(texture.getContext(), kind, width, height, state, orientation);
+    texture.refresh();
+  });
+  return textures;
+}
+
+function ensureBusDriverTextures(scene: Phaser.Scene): Record<GroundVisualState, string> {
+  const textures = {} as Record<GroundVisualState, string>;
+  STATES.forEach((state) => {
+    const key = `bus-driver-${state}`;
+    textures[state] = key;
+    if (scene.textures.exists(key)) return;
+    const texture = scene.textures.createCanvas(key, 64, 64);
+    if (!texture) return;
+    drawBusDriver(texture.getContext(), state);
     texture.refresh();
   });
   return textures;
@@ -237,6 +326,41 @@ function ensureArchitectureFrames(scene: Phaser.Scene, kind: DecorationKind): Re
   return frames;
 }
 
+function ensureBusModuleTextures(scene: Phaser.Scene, kind: BusModuleKey, width: number, height: number): Record<GroundVisualState, string> | undefined {
+  const sourceTexture = scene.textures.get("bus-interior-modules");
+  if (!sourceTexture || !sourceTexture.key || sourceTexture.key === "__MISSING") return undefined;
+  const source = sourceTexture.getSourceImage() as CanvasImageSource;
+  const crop = BUS_MODULE_CROPS[kind];
+  const textures = {} as Record<GroundVisualState, string>;
+  STATES.forEach((state) => {
+    const key = `bus-module-${kind}-${state}-${width}x${height}`;
+    textures[state] = key;
+    if (scene.textures.exists(key)) return;
+    const canvasTexture = scene.textures.createCanvas(key, width, height);
+    if (!canvasTexture) return;
+    const ctx = canvasTexture.getContext();
+    ctx.imageSmoothingEnabled = false;
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(source, crop.x, crop.y, crop.width, crop.height, 0, 0, width, height);
+    if (state !== "warm") {
+      const image = ctx.getImageData(0, 0, width, height);
+      for (let index = 0; index < image.data.length; index += 4) {
+        const r = image.data[index];
+        const g = image.data[index + 1];
+        const b = image.data[index + 2];
+        const gray = Math.round(r * 0.24 + g * 0.68 + b * 0.08);
+        const mix = state === "memory" ? 0.34 : 0;
+        image.data[index] = Math.round(gray * (1 - mix) + r * mix);
+        image.data[index + 1] = Math.round(gray * (1 - mix) + g * mix);
+        image.data[index + 2] = Math.round(gray * (1 - mix) + b * mix);
+      }
+      ctx.putImageData(image, 0, 0);
+    }
+    canvasTexture.refresh();
+  });
+  return textures;
+}
+
 export function renderMapDecoration(scene: Phaser.Scene, decoration: MapDecoration): EnvironmentSprite | EnvironmentSprite[] | null {
   if (decoration.kind === "gate-building") {
     const columns = Math.max(1, Math.round(decoration.width / 16));
@@ -270,6 +394,19 @@ export function renderMapDecoration(scene: Phaser.Scene, decoration: MapDecorati
     if (decoration.flipX) sprite.setFlipX(true);
     return { sprite, textures: RUINS_FACADE_TEXTURE, x: decoration.x, y: decoration.y - fit.height / 2 };
   }
+  const busModule = BUS_MODULE_KINDS[decoration.kind];
+  if (busModule) {
+    const width = Math.max(1, Math.round(decoration.width));
+    const height = Math.max(1, Math.round(decoration.height));
+    const textures = ensureBusModuleTextures(scene, busModule, width, height);
+    if (!textures) return null;
+    const sprite = scene.add.image(decoration.x, decoration.y, textures.base)
+      .setOrigin(0.5, 1)
+      .setDisplaySize(width, height)
+      .setDepth(decoration.depth ?? decoration.y);
+    if (decoration.flipX) sprite.setFlipX(true);
+    return { sprite, textures, x: decoration.x, y: decoration.y - height / 2 };
+  }
   const frames = ensureArchitectureFrames(scene, decoration.kind);
   if (frames) {
     const crop = ARCHITECTURE_CROPS[decoration.kind];
@@ -283,10 +420,30 @@ export function renderMapDecoration(scene: Phaser.Scene, decoration: MapDecorati
   if (!(PROGRAMMATIC_KINDS as readonly DecorationKind[]).includes(decoration.kind)) return null;
   const width = Math.max(1, Math.round(decoration.width));
   const height = Math.max(1, Math.round(decoration.height));
-  const textures = ensureProgrammaticTextures(scene, decoration.kind as ProgrammaticKind, width, height);
+  const textures = ensureProgrammaticTextures(scene, decoration.kind as ProgrammaticKind, width, height, decoration.orientation);
   const sprite = scene.add.image(decoration.x, decoration.y, textures.base).setOrigin(0.5, 1).setDisplaySize(width, height).setDepth(decoration.y);
   if (decoration.flipX) sprite.setFlipX(true);
   return { sprite, textures, x: decoration.x, y: decoration.y - height / 2 };
+}
+
+/** Render the bell only when the bus scene has announced its destination. */
+export function renderBusBellDecoration(scene: Phaser.Scene, point: { x: number; y: number }): EnvironmentSprite | null {
+  const textures = ensureBusModuleTextures(scene, "bell", 20, 34);
+  if (!textures) return null;
+  const sprite = scene.add.image(point.x, point.y + 34, textures.base)
+    .setOrigin(0.5, 1)
+    .setDisplaySize(20, 34)
+    .setDepth(point.y + 22);
+  return { sprite, textures, x: point.x, y: point.y };
+}
+
+export function renderBusDriverDecoration(scene: Phaser.Scene, point: { x: number; y: number }): EnvironmentSprite {
+  const textures = ensureBusDriverTextures(scene);
+  const sprite = scene.add.image(point.x, point.y, textures.base)
+    .setOrigin(0.5, 1)
+    .setDisplaySize(48, 48)
+    .setDepth(point.y + 2);
+  return { sprite, textures, x: point.x, y: point.y };
 }
 
 export function ensureCaneTextures(scene: Phaser.Scene): void {

@@ -23,9 +23,14 @@
 | `src/assets/bus-window-panorama-pixel.png` | 巴士过场车窗外街景条（1024×96） | 内置 ImageGen 生成雨夜澳门骑楼横向街景；取原图中段、nearest-neighbor 缩放并量化为 96 色，只在车窗模块中整数像素滚动 |
 | `docs/q-align/bus-window-panorama-source.png` | 车窗街景生成记录与复核源图 | 无人物、车辆、标牌、路线、可读文字和 HUD；生产只裁取窄幅街景，不作为全屏背景 |
 | `src/assets/traveler-sit.png` | 候车长椅坐姿玩家精灵 | 基于玩家正面像素角色生成并裁切为 64×64；运行时脚底锚定长椅中心，人物整体绘制在长椅前层 |
+| `src/assets/traveler-sit-up.png` | 公交车厢下排座椅的向上/背向坐姿玩家精灵 | 内置 ImageGen 参考 `traveler-sit.png` 生成；绿幕去除辅助处理后以 nearest-neighbor 缩至 64×64，无盲杖 |
+| `docs/q-align/traveler-sit-up-source.png` | 下排坐姿生成记录与复核源图 | 内置 ImageGen 生成的背向坐姿源图；生产资源仅保留透明像素角色，不含绿幕 |
 | `src/assets/sighted-guide-tutorial-pixel.png` | 口岸序章的扶盲教学三格插图（960×520） | 内置 ImageGen 参考用户提供的动作说明图，仅保留正确动作关系并改为暖灰雨夜像素风；裁去外边距、nearest-neighbor 缩放并量化为 128 色；所有中文说明由 React 叠加 |
 | `docs/q-align/sighted-guide-tutorial-source.png` | 扶盲教学图生成记录与复核源图 | 三格分别表现征求同意、盲人主动握肘、引导者领先半步并描述路缘；无图片内文字、箭头、HUD、品牌或水印 |
 | `src/assets/bus-accessibility-tip-pixel.png` | 上车前“帮助盲人乘车”公益贴士插图 | 内置 ImageGen 生成暖灰雨夜像素公交站场景；盲人持杖等车、公众主动询问、公交进站；无品牌、可读文字、水印或用户照片人物元素 |
+| `src/assets/bus-interior-modules-pixel.png` | 无盲道车厢的模块化雨窗、座椅扶手、扶杆、刷卡机、按铃与顶灯 | 内置 ImageGen 生成透明模块图集；统一绿幕去除、nearest-neighbor 裁切；无品牌、可读文字、路线标记或 HUD |
+| `docs/q-align/bus-interior-modules-source.png` | 车厢模块图集生成记录与复核源图 | 仅作 ImageGen 生成记录；生产运行时使用去绿幕后模块图集，不使用整张车厢背景 |
+| `src/assets/bus-ride-access-tip-pixel.png` | 公交无障碍贴士完整公益插画 | 内置 ImageGen 生成单张暖灰雨夜像素车厢场景；盲人乘客与公众/司机通过姿态表现先询问、说清楚、再协助；无品牌、可读文字、水印或用户照片元素 |
 | `docs/q-align/gate-facade-source.png` | 已退役的关闸立面参考源图 | 仅保留为历史美术参考；生产代码不再导入或裁切该图。关闸现由 parapet/window/wall/canopy/pillar/entrance 六类 16px 程序化瓦片和代码文字牌组成，并进入统一 base/memory/warm 三态 |
 
 本轮建筑与过场提示约束为：雨夜暖灰澳门葡中建筑、16-bit 像素模块、统一比例；禁止 HUD、路线、品牌和非代码可读文字。章节图不含预绘制圆点或连线，车窗图只作为窄幅模块，关闸建筑完全瓦片化且不参与盲道逻辑。扶盲教学图允许人物，但正确动作和中文说明分别由插图与代码承担。
