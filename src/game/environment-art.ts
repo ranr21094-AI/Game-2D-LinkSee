@@ -47,7 +47,7 @@ const BUS_MODULE_KINDS: Partial<Record<DecorationKind, BusModuleKey>> = {
   "bus-light": "light",
 };
 
-const PROGRAMMATIC_KINDS = ["shelter", "bus", "bench", "lamp", "signal", "bus-window", "bus-pole", "bus-seat-row", "bus-driver-seat", "stop-sign-17", "stop-sign-25"] as const;
+const PROGRAMMATIC_KINDS = ["shelter", "bus", "bench", "lamp", "signal", "ramp-rail", "bus-window", "bus-pole", "bus-seat-row", "bus-driver-seat", "stop-sign-17", "stop-sign-25", "shop-front"] as const;
 type ProgrammaticKind = (typeof PROGRAMMATIC_KINDS)[number];
 
 type Palette = { stone: string; dark: string; light: string; metal: string; glow: string; red: string };
@@ -180,12 +180,36 @@ function drawProgrammatic(ctx: CanvasRenderingContext2D, kind: DecorationKind, w
     rect(ctx, p.metal, width / 2 - 2, kind === "lamp" ? 21 : 18, 2, height - 24);
     rect(ctx, p.dark, 2, 0, width - 4, kind === "lamp" ? 24 : 31);
     ctx.fillStyle = kind === "signal" ? p.red : p.glow; ctx.beginPath(); ctx.arc(width / 2, kind === "signal" ? 12 : 10, kind === "signal" ? 5 : 7, 0, Math.PI * 2); ctx.fill();
+  } else if (kind === "ramp-rail") {
+    rect(ctx, p.dark, 1, 0, width - 2, height);
+    rect(ctx, p.metal, 2, 1, Math.max(2, width - 4), height - 1);
+    rect(ctx, p.light, 3, 2, 1, Math.max(1, height - 4));
+    for (let y = 8; y < height; y += 32) rect(ctx, p.dark, 0, y, width, 4);
   } else if (kind === "bus-window") {
     rect(ctx, p.dark, 0, 0, width, height); rect(ctx, p.stone, 4, 4, width - 8, height - 8);
     for (let x = 10; x < width - 10; x += 52) { rect(ctx, p.dark, x, 10, 42, 34); rect(ctx, p.glow, x + 3, 13, 36, 12); }
     rect(ctx, p.metal, 0, height - 13, width, 5);
   } else if (kind === "bus-pole") {
     rect(ctx, p.dark, 3, 0, 6, height); rect(ctx, p.light, 4, 0, 2, height); rect(ctx, p.dark, 0, 8, 12, 5); rect(ctx, p.dark, 0, height - 13, 12, 5);
+  } else if (kind === "shop-front") {
+    // striped awning with a jagged drip edge
+    const awningHeight = 12;
+    for (let x = 0; x < width; x += 8) rect(ctx, (x / 8) % 2 === 0 ? p.red : p.light, x, 0, Math.min(8, width - x), awningHeight);
+    rect(ctx, p.dark, 0, awningHeight, width, 2);
+    for (let x = 2; x < width - 2; x += 8) rect(ctx, p.dark, x, awningHeight + 2, 4, 2);
+    // stone facade with a centered doorway and flanking display windows
+    rect(ctx, p.stone, 0, awningHeight + 4, width, height - awningHeight - 4);
+    rect(ctx, p.dark, 0, height - 3, width, 3);
+    const doorWidth = 18;
+    const doorLeft = width / 2 - doorWidth / 2;
+    rect(ctx, p.dark, doorLeft, awningHeight + 8, doorWidth, height - awningHeight - 10);
+    rect(ctx, p.glow, doorLeft + 3, awningHeight + 11, doorWidth - 6, 8);
+    [8, width - 8 - 16].forEach((x) => {
+      if (x + 16 > doorLeft && x < doorLeft + doorWidth) return;
+      rect(ctx, p.dark, x, awningHeight + 10, 16, 18);
+      rect(ctx, p.glow, x + 2, awningHeight + 12, 12, 9);
+      rect(ctx, p.metal, x + 2, awningHeight + 22, 12, 4);
+    });
   } else if (kind === "bus-seat-row" || kind === "bus-driver-seat") {
     drawBusSeat(ctx, width, height, state, kind === "bus-driver-seat" ? "driver" : (orientation ?? "upper"));
   }
@@ -305,6 +329,35 @@ function ensureGateSignTextures(scene: Phaser.Scene): Record<GroundVisualState, 
   return keys;
 }
 
+/** Programmatic Chinese shop signboard: dark plate, bright pixel border, horizontal or vertical text. */
+function ensureShopSignTextures(scene: Phaser.Scene, label: string, width: number, height: number, vertical: boolean): Record<GroundVisualState, string> {
+  const keys = {} as Record<GroundVisualState, string>;
+  STATES.forEach((state) => {
+    const key = `shop-sign-${label}-${vertical ? "v" : "h"}-${state}-${width}x${height}`;
+    keys[state] = key;
+    if (scene.textures.exists(key)) return;
+    const texture = scene.textures.createCanvas(key, width, height);
+    if (!texture) return;
+    const ctx = texture.getContext();
+    const p = PALETTES[state];
+    rect(ctx, p.dark, 0, 0, width, height);
+    rect(ctx, p.glow, 1, 1, width - 2, height - 2);
+    rect(ctx, p.dark, 3, 3, width - 6, height - 6);
+    ctx.font = '700 12px "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = p.glow;
+    if (vertical) {
+      const step = (height - 8) / label.length;
+      [...label].forEach((char, index) => ctx.fillText(char, width / 2, 4 + step * index + step / 2));
+    } else {
+      ctx.fillText(label, width / 2, height / 2);
+    }
+    texture.refresh();
+  });
+  return keys;
+}
+
 export type EnvironmentSprite = {
   sprite: Phaser.GameObjects.Image;
   textures: Record<GroundVisualState, string>;
@@ -396,6 +449,13 @@ export function renderMapDecoration(scene: Phaser.Scene, decoration: MapDecorati
     const sprite = scene.add.image(decoration.x, decoration.y, RUINS_FACADE_TEXTURE.base).setOrigin(0.5, 1).setDisplaySize(fit.width, fit.height).setDepth(decoration.y);
     if (decoration.flipX) sprite.setFlipX(true);
     return { sprite, textures: RUINS_FACADE_TEXTURE, x: decoration.x, y: decoration.y - fit.height / 2 };
+  }
+  if (decoration.kind === "shop-sign") {
+    const width = Math.max(1, Math.round(decoration.width));
+    const height = Math.max(1, Math.round(decoration.height));
+    const textures = ensureShopSignTextures(scene, decoration.label ?? "商铺", width, height, Boolean(decoration.signVertical));
+    const sprite = scene.add.image(decoration.x, decoration.y, textures.base).setOrigin(0.5, 1).setDepth(decoration.depth ?? decoration.y);
+    return { sprite, textures, x: decoration.x, y: decoration.y - height / 2 };
   }
   const busModule = BUS_MODULE_KINDS[decoration.kind];
   if (busModule) {

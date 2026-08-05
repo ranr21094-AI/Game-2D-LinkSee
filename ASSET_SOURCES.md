@@ -16,4 +16,8 @@
 
 2026-08-05 公交车厢乘客和司机改用真正坐姿 NPC：新增 `bus-passenger-sit-up.png` 与 `bus-driver-sit.png`；内置 ImageGen 生成、绿幕去除并缩至 64×64，乘客落在座面内，司机包含驾驶座与方向盘。
 
+2026-08-05 大三巴终章新增 `lam-wheelchair.png`、`lam-daughter-push.png` 与 `wheelchair-pushing-tip-pixel.png`；内置 ImageGen 生成轮椅林伯、成年女儿推行三帧精灵和完整公益插画，精灵经绿幕去除后整理为 64×64/帧，参考图只用于动作关系，不复制人物、文字或水印。
+
+2026-08-06 宠物店公益贴士新增 `guide-dog-tip-pixel.png`；Seedream（豆包生图）生成暖灰雨夜像素三联插画（导盲犬被挡门外、检疫隔离流程、导盲机器人止步楼梯），缩至 960×480，不含品牌、可读文字、水印或真实人物元素；源图存 `docs/q-align/generated-sources/guide-dog-tip-source.png`。
+
 历史整图背景和 M2–M4 图片条已经从生产代码与 `src/assets/` 删除；它们不再代表当前瓦片化版本。

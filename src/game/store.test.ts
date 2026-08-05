@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { LEGACY_SAVE_KEY, SAVE_KEY, getActiveElapsedMs, getSnapshot, loadSnapshot, patchSnapshot, pauseActiveTimer, resumeActiveTimer, setCheckpoint, startNewGame, unlockTip } from "./store";
-import type { GameSnapshotV2 } from "./types";
+import { SAVE_KEY, getActiveElapsedMs, getSnapshot, loadSnapshot, patchSnapshot, pauseActiveTimer, resumeActiveTimer, setCheckpoint, startNewGame, unlockTip } from "./store";
 
 class MemoryStorage implements Storage {
   private values = new Map<string, string>();
@@ -12,7 +11,7 @@ class MemoryStorage implements Storage {
   setItem(key: string, value: string): void { this.values.set(key, value); }
 }
 
-describe("V3 game snapshot", () => {
+describe("V4 game snapshot", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-04T10:00:00Z"));
@@ -67,29 +66,34 @@ describe("V3 game snapshot", () => {
     expect(loadSnapshot()?.unlockedTips).toEqual(["bus-ride-access"]);
   });
 
-  it("migrates old bus interior saves to the matching safe stage", () => {
-    const legacy: GameSnapshotV2 = {
-      version: 2, objectiveId: "find-seat", scene: "bus-interior", busState: "boarding", selectedSeatId: null, memories: [], detourScore: 0,
-      startedAt: 1, elapsedBeforeResume: 9000, returnRequested: false, ending: null, colorMemory: [],
-      settings: { masterVolume: 0.5, effectsVolume: 0.7, dialogueVolume: 0.8, subtitleScale: 1, reducedMotion: false },
-    };
-    localStorage.clear();
-    localStorage.setItem(LEGACY_SAVE_KEY, JSON.stringify(legacy));
-    expect(loadSnapshot()).toMatchObject({ scene: "bus-interior", objectiveId: "find-seat", resumeStage: "bus-interior-seat", activeElapsedMs: 0 });
+  it("persists the wheelchair pushing tip without duplicating it", () => {
+    unlockTip("wheelchair-pushing");
+    unlockTip("wheelchair-pushing");
+    expect(getSnapshot().unlockedTips).toEqual(["wheelchair-pushing"]);
+    expect(loadSnapshot()?.unlockedTips).toEqual(["wheelchair-pushing"]);
   });
 
-  it("migrates V2 story state while discarding its broken wall-clock timer", () => {
-    const legacy: GameSnapshotV2 = {
-      version: 2, objectiveId: "follow-handrail", scene: "old-city", busState: "alighted", selectedSeatId: "seat-a2", memories: ["bus-rain"], detourScore: 2,
-      startedAt: 1, elapsedBeforeResume: 9999, returnRequested: false, ending: null, colorMemory: [],
-      settings: { masterVolume: 0.5, effectsVolume: 0.7, dialogueVolume: 0.8, subtitleScale: 1.2, reducedMotion: true },
-    };
+  it("persists the guide dog tip without duplicating it", () => {
+    unlockTip("guide-dog-access");
+    unlockTip("guide-dog-access");
+    expect(getSnapshot().unlockedTips).toEqual(["guide-dog-access"]);
+    expect(loadSnapshot()?.unlockedTips).toEqual(["guide-dog-access"]);
+  });
+
+  it("filters unknown V4 tips while retaining wheelchair guidance", () => {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ ...getSnapshot(), unlockedTips: ["wheelchair-pushing", "unknown-tip"] }));
+    expect(loadSnapshot()?.unlockedTips).toEqual(["wheelchair-pushing"]);
+  });
+
+  it("discards outdated saves so the merged old-city starts fresh", () => {
     localStorage.clear();
-    localStorage.setItem(LEGACY_SAVE_KEY, JSON.stringify(legacy));
-    const migrated = loadSnapshot();
-    expect(migrated).toMatchObject({ version: 3, scene: "old-city", objectiveId: "follow-handrail", resumeStage: "old-city-rail", activeElapsedMs: 0, mobilityGuideSeen: false, unlockedTips: [] });
-    expect(migrated?.settings.ambientVolume).toBeGreaterThan(0);
-    expect(localStorage.getItem(SAVE_KEY)).not.toBeNull();
-    expect(localStorage.getItem(LEGACY_SAVE_KEY)).toBeNull();
+    localStorage.setItem("sound-road-macau-2d:v3", JSON.stringify({ version: 3, scene: "old-city-crossing", settings: {} }));
+    expect(loadSnapshot()).toBeNull();
+    expect(localStorage.getItem("sound-road-macau-2d:v3")).toBeNull();
+  });
+
+  it("rejects snapshots with a mismatched version", () => {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ ...getSnapshot(), version: 3 }));
+    expect(loadSnapshot()).toBeNull();
   });
 });

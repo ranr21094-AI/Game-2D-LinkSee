@@ -16,6 +16,7 @@ export type DecorationKind =
   | "low-house"
   | "stone-gate"
   | "ruins-facade"
+  | "ramp-rail"
   | "bus-window"
   | "bus-pole"
   | "bus-seat-row"
@@ -25,7 +26,9 @@ export type DecorationKind =
   | "bus-bell"
   | "bus-light"
   | "stop-sign-17"
-  | "stop-sign-25";
+  | "stop-sign-25"
+  | "shop-sign"
+  | "shop-front";
 
 export type MapDecoration = {
   kind: DecorationKind;
@@ -43,6 +46,10 @@ export type MapDecoration = {
   solidWidth?: number;
   /** Blocked strip height measured up from the sprite base; defaults to height. */
   solidHeight?: number;
+  /** Chinese signboard text for "shop-sign" decorations. */
+  label?: string;
+  /** Render "shop-sign" text vertically (one character per line). */
+  signVertical?: boolean;
 };
 
 export type TileMapDefinition = {

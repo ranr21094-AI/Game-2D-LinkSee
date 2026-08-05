@@ -14,6 +14,7 @@ export type GroundTileKey =
   | "drain"
   | "manhole"
   | "steps"
+  | "ramp"
   | "building"
   | "bus-floor"
   | "metal-floor"
@@ -31,7 +32,7 @@ const TILE = 16;
 const STATES: GroundVisualState[] = ["base", "memory", "warm"];
 
 const KEYS: GroundTileKey[] = [
-  "stone", "plaza", "sidewalk", "concrete", "asphalt", "zebra", "lane", "paint", "curb", "drain", "manhole", "steps", "building",
+  "stone", "plaza", "sidewalk", "concrete", "asphalt", "zebra", "lane", "paint", "curb", "drain", "manhole", "steps", "ramp", "building",
   "bus-floor", "metal-floor", "bus-seat", "grass", "bush", "dirt", "wall", "fence",
 ];
 
@@ -48,7 +49,7 @@ type ToneSet = Record<GroundVisualState, Rgb>;
 const WARM_TONES: Record<GroundTileKey, Rgb> = {
   stone: [158, 136, 94], plaza: [146, 124, 86], sidewalk: [178, 163, 132], concrete: [164, 143, 108], asphalt: [93, 87, 82],
   zebra: [211, 190, 143], lane: [202, 165, 76], paint: [202, 166, 78], curb: [174, 151, 111], drain: [93, 88, 78], manhole: [104, 94, 80],
-  steps: [167, 144, 106], building: [146, 126, 103], "bus-floor": [124, 111, 89], "metal-floor": [129, 126, 115], "bus-seat": [126, 101, 70],
+  steps: [167, 144, 106], ramp: [158, 139, 108], building: [146, 126, 103], "bus-floor": [124, 111, 89], "metal-floor": [129, 126, 115], "bus-seat": [126, 101, 70],
   grass: [88, 132, 76], bush: [66, 122, 66], dirt: [132, 106, 70], wall: [172, 142, 102], fence: [96, 82, 60],
 };
 
@@ -108,7 +109,7 @@ function drawTile(ctx: CanvasRenderingContext2D, key: GroundTileKey, tone: Rgb, 
     }
     if (key === "zebra") {
       ctx.fillStyle = rgb(lighten(tone, 0.38));
-      [0, 8].forEach((x) => ctx.fillRect(x, 0, 6, 16));
+      [0, 8].forEach((y) => ctx.fillRect(0, y, 16, 6));
     }
   }
   if (key === "paint") {
@@ -131,6 +132,13 @@ function drawTile(ctx: CanvasRenderingContext2D, key: GroundTileKey, tone: Rgb, 
   }
   if (key === "steps") {
     for (let y = 3; y < 16; y += 4) { ctx.fillStyle = rgb(darken(tone, 0.28)); ctx.fillRect(0, y, 16, 1); }
+  }
+  if (key === "ramp") {
+    seam(ctx, tone);
+    ctx.fillStyle = rgb(darken(tone, 0.2));
+    for (let y = 3 + variant; y < 16; y += 5) ctx.fillRect(2, y, 12, 1);
+    ctx.fillStyle = rgb(lighten(tone, 0.18));
+    ctx.fillRect(2, 1, 12, 1);
   }
   if (key === "building" || key === "wall") {
     for (let y = 3; y < 16; y += 4) { ctx.fillStyle = rgb(darken(tone, 0.25)); ctx.fillRect(0, y, 16, 1); }

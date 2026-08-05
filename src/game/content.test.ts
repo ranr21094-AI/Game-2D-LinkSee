@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { composeRepeatText, OBJECTIVES, OLD_CITY_CROSSING, OLD_CITY_HANDRAIL, PATHS, REVEAL_PROFILE, TACTILE_LIT_MS, TIP_DEFINITIONS, TUTORIAL_LINES } from "./content";
+import { composeRepeatText, OBJECTIVES, OLD_CITY_CROSSING, PATHS, REVEAL_PROFILE, TACTILE_LIT_MS, TIP_DEFINITIONS, TUTORIAL_LINES } from "./content";
 import { BUS_SEATED_SPRITE_KEYS } from "./businterior-map";
 import { BUS_STOP_TILEMAP } from "./busstop-map";
-import { CROSSING_TILEMAP } from "./crossing-map";
 import { OLD_CITY_TILEMAP } from "./oldcity-map";
 import { RUINS_TILEMAP } from "./ruins-map";
 import { isWalkable, type TileMapDefinition } from "./tilemap";
@@ -17,9 +16,9 @@ describe("tactile path definitions", () => {
       });
     });
     expect(PATHS["old-city"].nodes.filter((node) => node.breakBefore)).toHaveLength(1);
-    expect(PATHS["old-city-crossing"].nodes.filter((node) => node.breakBefore)).toHaveLength(1);
     expect(PATHS["bus-stop"].nodes.filter((node) => node.breakBefore)).toHaveLength(0);
     expect(PATHS).not.toHaveProperty("bus-interior");
+    expect(PATHS).not.toHaveProperty("old-city-crossing");
   });
 
   it("keeps every tactile route segment axis-aligned", () => {
@@ -35,7 +34,6 @@ describe("tactile path definitions", () => {
     const maps: Record<keyof typeof PATHS, TileMapDefinition> = {
       "bus-stop": BUS_STOP_TILEMAP,
       "old-city": OLD_CITY_TILEMAP,
-      "old-city-crossing": CROSSING_TILEMAP,
       ruins: RUINS_TILEMAP,
     };
     Object.entries(PATHS).forEach(([scene, path]) => {
@@ -51,18 +49,19 @@ describe("tactile path definitions", () => {
     expect(decisions.some((node) => node.taskId === "meet-lam")).toBe(true);
   });
 
-  it("bridges the old-city tactile-path gap with the guide rail", () => {
+  it("anchors the crossing decisions at the request point and the far curb", () => {
     const oldCity = PATHS["old-city"].nodes;
-    const railStart = oldCity.find((node) => node.taskId === "follow-old-city-path");
-    const railEnd = oldCity.find((node) => node.taskId === "follow-handrail");
-    expect(railStart).toMatchObject(OLD_CITY_HANDRAIL.start);
-    expect(railEnd).toMatchObject({ ...OLD_CITY_HANDRAIL.end, breakBefore: true });
+    expect(oldCity.find((node) => node.taskId === "request-crossing")).toMatchObject(OLD_CITY_CROSSING.requestPoint);
+    expect(oldCity.find((node) => node.taskId === "cross-junction")).toMatchObject({ ...OLD_CITY_CROSSING.farCurb, breakBefore: true });
   });
 
-  it("keeps tactile paving on the two curbs instead of across the roadway", () => {
-    const crossing = PATHS["old-city-crossing"].nodes;
-    expect(crossing.find((node) => node.taskId === "request-crossing")).toMatchObject(OLD_CITY_CROSSING.requestPoint);
-    expect(crossing.find((node) => node.taskId === "cross-junction")).toMatchObject({ ...OLD_CITY_CROSSING.farCurb, breakBefore: true });
+  it("chains the merged street objectives along the U-shaped route", () => {
+    const oldCity = PATHS["old-city"].nodes;
+    expect(oldCity.find((node) => node.taskId === "follow-street-south")).toMatchObject(OBJECTIVES["follow-street-south"].target);
+    expect(oldCity.find((node) => node.taskId === "follow-street-east")).toMatchObject(OBJECTIVES["follow-street-east"].target);
+    expect(oldCity.find((node) => node.taskId === "visit-pet-shop")).toMatchObject(OBJECTIVES["visit-pet-shop"].target);
+    expect(oldCity.find((node) => node.taskId === "reach-terminus")).toMatchObject(OBJECTIVES["reach-terminus"].target);
+    expect(OBJECTIVES["visit-pet-shop"].interaction).toBe("interact");
   });
 
   it("uses the requested reveal ranges and durations", () => {
@@ -85,8 +84,8 @@ describe("tactile path definitions", () => {
     expect(TUTORIAL_LINES.join(" ")).not.toMatch(/F\s*辅助|F\s*手机|手机定位/);
   });
 
-  it("defines both data-driven accessibility tips", () => {
-    expect(Object.keys(TIP_DEFINITIONS)).toEqual(["sighted-guide", "bus-access", "bus-ride-access"]);
+  it("defines all data-driven accessibility tips", () => {
+    expect(Object.keys(TIP_DEFINITIONS)).toEqual(["sighted-guide", "bus-access", "bus-ride-access", "wheelchair-pushing", "guide-dog-access"]);
     const tip = TIP_DEFINITIONS["bus-access"];
     expect(tip.title).toBe("帮助盲人乘车");
     expect(tip.steps).toHaveLength(3);
@@ -97,8 +96,34 @@ describe("tactile path definitions", () => {
     expect(rideTip.image).toContain("bus-ride-access-tip-pixel");
     expect(rideTip.steps).toHaveLength(3);
     expect(rideTip.callout).toContain("每辆车都更容易被理解");
+    const wheelchairTip = TIP_DEFINITIONS["wheelchair-pushing"];
+    expect(wheelchairTip.title).toBe("轮椅推行需要学习");
+    expect(wheelchairTip.heading).toBe("会推轮椅，不只是向前用力");
+    expect(wheelchairTip.image).toContain("wheelchair-pushing-tip-pixel");
+    expect(wheelchairTip.steps).toHaveLength(3);
+    expect(wheelchairTip.steps.map((step) => step.title)).toEqual(["先问再检查", "平地与上坡", "下坡与障碍"]);
+    expect(wheelchairTip.callout).toContain("不拿乘客安全试错");
+    const guideDogTip = TIP_DEFINITIONS["guide-dog-access"];
+    expect(guideDogTip.title).toBe("导盲犬在澳门");
+    expect(guideDogTip.heading).toBe("在澳门，导盲犬仍是「宠物」");
+    expect(guideDogTip.image).toContain("guide-dog-tip-pixel");
+    expect(guideDogTip.steps).toHaveLength(3);
+    expect(guideDogTip.steps.map((step) => step.title)).toEqual(["法律未承认", "购买困难", "电子导盲犬"]);
+    expect(guideDogTip.steps[2].body).toContain("楼梯");
+    expect(guideDogTip.callout).toContain("制度的空白");
     expect(BUS_SEATED_SPRITE_KEYS.lower).toBe("traveler-sit-up");
     expect(OBJECTIVES["find-card-reader"].target).toEqual({ x: 488, y: 284 });
     expect(OBJECTIVES["ring-bell"].target).toEqual({ x: 152, y: 188 });
+  });
+
+  it("uses the straight central ramp for the wheelchair finale", () => {
+    expect(PATHS.ruins.nodes).toEqual([
+      { x: 328, y: 316, kind: "guidance" },
+      { x: 328, y: 268, kind: "decision", taskId: "meet-lam" },
+      { x: 328, y: 204, kind: "guidance" },
+      { x: 328, y: 108, kind: "decision", taskId: "follow-wheelchair" },
+    ]);
+    expect(OBJECTIVES["meet-lam"].target).toEqual({ x: 328, y: 268 });
+    expect(OBJECTIVES["follow-wheelchair"].target).toEqual({ x: 328, y: 108 });
   });
 });

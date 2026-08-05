@@ -1,6 +1,6 @@
 import type { EndingId, HudState, SceneId, TipId, TilePoint } from "./types";
 
-export type TipSource = "intro" | "sidebar" | "bus-door" | "bell";
+export type TipSource = "intro" | "sidebar" | "bus-door" | "bell" | "wheelchair" | "pet-shop";
 export type TipEventPayload = { id: TipId; source: TipSource };
 
 type EventMap = {

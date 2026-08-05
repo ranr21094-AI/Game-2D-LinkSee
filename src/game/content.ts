@@ -1,8 +1,10 @@
 import busAccessibilityTipUrl from "../assets/bus-accessibility-tip-pixel.png";
 import busRideAccessTipUrl from "../assets/bus-ride-access-tip-pixel.png";
+import guideDogTipUrl from "../assets/guide-dog-tip-pixel.png";
 import sightedGuideTutorialUrl from "../assets/sighted-guide-tutorial-pixel.png";
+import wheelchairPushingTipUrl from "../assets/wheelchair-pushing-tip-pixel.png";
 import { BUS_BELL, BUS_CARD_READER, BUS_SEAT_EDGE } from "./businterior-map";
-import type { CrossingDefinition, GuideRailDefinition, ObjectiveStep2D, RevealProfile, SceneId, TactilePathDefinition, TipDefinition, TipId } from "./types";
+import type { CrossingDefinition, ObjectiveStep2D, RevealProfile, SceneId, TactilePathDefinition, TipDefinition, TipId } from "./types";
 
 export const REVEAL_PROFILE: RevealProfile = {
   tapForwardTiles: 1,
@@ -59,6 +61,34 @@ export const TIP_DEFINITIONS: Record<TipId, TipDefinition> = {
     ],
     callout: "无障碍不是让乘客记住每辆车的不同，而是让每辆车都更容易被理解。",
   },
+  "wheelchair-pushing": {
+    id: "wheelchair-pushing",
+    title: "轮椅推行需要学习",
+    heading: "会推轮椅，不只是向前用力",
+    summary: "公众缺少正确推行手动轮椅的教育，突然转向、失控加速或错误上下坡可能让乘客陷入危险。",
+    image: wheelchairPushingTipUrl,
+    imageAlt: "暖灰雨夜像素插图：女儿先检查林伯的脚踏板，再平稳推轮椅上坡，并在下坡时控制速度",
+    steps: [
+      { title: "先问再检查", body: "征求乘客意见，确认脚在脚踏板上、衣物远离车轮；停车时使用刹车，移动前先说明。" },
+      { title: "平地与上坡", body: "保持轮椅正直、速度平稳，推行者靠近轮椅并避免突然转向；坡度过大时停止并更换路线。" },
+      { title: "下坡与障碍", body: "始终控制速度，不能让轮椅自行滑下；不确定轮椅结构或操作方式时询问乘客并寻求受训人员帮助。" },
+    ],
+    callout: "先问、先检查、稳速推行；坡度过大就停下，不拿乘客安全试错。",
+  },
+  "guide-dog-access": {
+    id: "guide-dog-access",
+    title: "导盲犬在澳门",
+    heading: "在澳门，导盲犬仍是「宠物」",
+    summary: "澳门法律尚未承认导盲犬的工作犬身份，视障者想带导盲犬出行，面对的是制度的空白。",
+    image: guideDogTipUrl,
+    imageAlt: "暖灰雨夜像素插图：持盲杖的视障者与导盲犬被挡在门外，中段是层层检疫隔离文件，右侧导盲机器人停在楼梯前无法上行",
+    steps: [
+      { title: "法律未承认", body: "导盲犬无法以工作犬身份入境，只能以「宠物狗」名义申请，检疫、隔离流程复杂漫长。" },
+      { title: "购买困难", body: "没有正式的引进渠道，个案往往需要议员协助推动，视障者难以独立完成。" },
+      { title: "电子导盲犬", body: "政府倾向发展导盲机器人：成本低、无需医疗照护，但面对楼梯等复杂地形仍无能为力。" },
+    ],
+    callout: "机器人可以补位，但补不齐制度的空白。",
+  },
 };
 
 export const ROUTE_BRIEFINGS: Record<"bus-stop" | "bus-interior", string> = {
@@ -70,8 +100,7 @@ export const SCENE_LABELS: Record<SceneId, string> = {
   "bus-stop": "關閘 · 17路候车区",
   "bus-interior": "17路 · 车厢",
   "bus-ride": "17路 · 前往白鸽巢",
-  "old-city": "白鸽巢 · 新旧城交界",
-  "old-city-crossing": "旧城 · 直行路口",
+  "old-city": "白鸽巢 · 旧城街市",
   ruins: "大三巴牌坊",
 };
 
@@ -129,64 +158,80 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
     triggerRadius: 0,
     interaction: "approach",
   },
-  "follow-old-city-path": {
-    id: "follow-old-city-path",
-    scene: "old-city",
-    label: "用盲杖判断凸纹，找到上坡扶手",
-    target: { x: 408, y: 204 },
-    triggerRadius: 34,
-    interaction: "interact",
-    checkpoint: true,
-  },
-  "follow-handrail": {
-    id: "follow-handrail",
-    scene: "old-city",
-    label: "握住右侧扶手，沿扶手前进",
-    target: { x: 408, y: 124 },
-    triggerRadius: 24,
-    interaction: "approach",
-  },
   "request-crossing": {
     id: "request-crossing",
-    scene: "old-city-crossing",
-    label: "到点阵处按 E 请求通行",
-    target: { x: 280, y: 284 },
+    scene: "old-city",
+    label: "沿盲道向北到路缘点阵，按 E 请求通行",
+    target: { x: 40, y: 124 },
     triggerRadius: 32,
     interaction: "interact",
     checkpoint: true,
   },
   "wait-crossing": {
     id: "wait-crossing",
-    scene: "old-city-crossing",
+    scene: "old-city",
     label: "留在路缘，等待可通行提示",
-    target: { x: 280, y: 284 },
+    target: { x: 40, y: 124 },
     triggerRadius: 32,
     interaction: "approach",
   },
   "cross-junction": {
     id: "cross-junction",
-    scene: "old-city-crossing",
-    label: "沿直线斑马线通过路口，再向右转",
-    target: { x: 280, y: 108 },
+    scene: "old-city",
+    label: "沿斑马线向东直行，抵达对岸路缘",
+    target: { x: 200, y: 124 },
     triggerRadius: 30,
     interaction: "approach",
   },
-  "leave-crossing": {
-    id: "leave-crossing",
-    scene: "old-city-crossing",
-    label: "抵达对岸后向右转，沿盲道离开路口",
-    target: { x: 520, y: 108 },
+  "follow-street-south": {
+    id: "follow-street-south",
+    scene: "old-city",
+    label: "沿盲道向南，走到商铺街口的点阵",
+    target: { x: 232, y: 284 },
+    triggerRadius: 30,
+    interaction: "approach",
+    checkpoint: true,
+  },
+  "follow-street-east": {
+    id: "follow-street-east",
+    scene: "old-city",
+    label: "沿商铺街盲道向东，找到北转点阵",
+    target: { x: 536, y: 284 },
+    triggerRadius: 30,
+    interaction: "approach",
+  },
+  "visit-pet-shop": {
+    id: "visit-pet-shop",
+    scene: "old-city",
+    label: "在猫记宠物门前停下，按 E 了解导盲犬的处境",
+    target: { x: 536, y: 140 },
+    triggerRadius: 30,
+    interaction: "interact",
+  },
+  "reach-terminus": {
+    id: "reach-terminus",
+    scene: "old-city",
+    label: "沿盲道北上，银号门前就是街口终点",
+    target: { x: 536, y: 92 },
     triggerRadius: 30,
     interaction: "approach",
   },
   "meet-lam": {
     id: "meet-lam",
     scene: "ruins",
-    label: "循着台阶前的盲道，找到林伯",
-    target: { x: 232, y: 108 },
+    label: "沿路边坡道找到轮椅上的林伯",
+    target: { x: 328, y: 268 },
     triggerRadius: 36,
     interaction: "interact",
     checkpoint: true,
+  },
+  "follow-wheelchair": {
+    id: "follow-wheelchair",
+    scene: "ruins",
+    label: "紧随林伯和女儿沿中央坡道上行",
+    target: { x: 328, y: 108 },
+    triggerRadius: 0,
+    interaction: "approach",
   },
 };
 
@@ -205,47 +250,32 @@ export const PATHS: Record<Exclude<SceneId, "bus-ride" | "bus-interior">, Tactil
   "old-city": {
     scene: "old-city",
     nodes: [
-      { x: 328, y: 284, kind: "guidance" },
-      { x: 328, y: 204, kind: "decision" },
-      { x: 408, y: 204, kind: "decision", taskId: "follow-old-city-path" },
-      { x: 408, y: 124, kind: "decision", taskId: "follow-handrail", breakBefore: true },
-    ],
-  },
-  "old-city-crossing": {
-    scene: "old-city-crossing",
-    nodes: [
-      { x: 136, y: 316, kind: "guidance" },
-      { x: 280, y: 316, kind: "guidance" },
-      { x: 280, y: 284, kind: "decision", taskId: "request-crossing" },
-      { x: 280, y: 108, kind: "decision", taskId: "cross-junction", breakBefore: true },
-      { x: 520, y: 108, kind: "decision", taskId: "leave-crossing" },
+      { x: 40, y: 284, kind: "guidance" },
+      { x: 40, y: 124, kind: "decision", taskId: "request-crossing" },
+      { x: 200, y: 124, kind: "decision", taskId: "cross-junction", breakBefore: true },
+      { x: 232, y: 124, kind: "decision" },
+      { x: 232, y: 284, kind: "decision", taskId: "follow-street-south" },
+      { x: 536, y: 284, kind: "decision", taskId: "follow-street-east" },
+      { x: 536, y: 140, kind: "decision", taskId: "visit-pet-shop" },
+      { x: 536, y: 92, kind: "decision", taskId: "reach-terminus" },
     ],
   },
   ruins: {
     scene: "ruins",
     nodes: [
-      { x: 328, y: 284, kind: "guidance" },
-      { x: 328, y: 204, kind: "decision" },
-      { x: 232, y: 204, kind: "guidance" },
-      { x: 232, y: 108, kind: "decision", taskId: "meet-lam" },
+      { x: 328, y: 316, kind: "guidance" },
+      { x: 328, y: 268, kind: "decision", taskId: "meet-lam" },
+      { x: 328, y: 204, kind: "guidance" },
+      { x: 328, y: 108, kind: "decision", taskId: "follow-wheelchair" },
     ],
   },
 };
 
-export const OLD_CITY_HANDRAIL: GuideRailDefinition = {
-  id: "old-city-right-rail",
-  scene: "old-city",
-  start: { x: 408, y: 204 },
-  end: { x: 408, y: 124 },
-  engageRadius: 30,
-  revealColor: 0xe1b85f,
-};
-
 export const OLD_CITY_CROSSING: CrossingDefinition = {
-  scene: "old-city-crossing",
-  requestPoint: { x: 280, y: 284 },
-  farCurb: { x: 280, y: 108 },
-  nearSideBoundary: { maxX: 320, minY: 280 },
+  scene: "old-city",
+  requestPoint: { x: 40, y: 124 },
+  farCurb: { x: 200, y: 124 },
+  nearSideBoundary: { maxX: 56, minY: 40 },
   corridorWidth: 48,
   waitMs: 2500,
 };

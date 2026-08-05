@@ -5,20 +5,20 @@ import travelerSitUrl from "../assets/traveler-sit.png";
 import travelerSitUpUrl from "../assets/traveler-sit-up.png";
 import busPassengerSitUpUrl from "../assets/bus-passenger-sit-up.png";
 import busDriverSitUrl from "../assets/bus-driver-sit.png";
-import lamUrl from "../assets/lam.png";
+import lamWheelchairUrl from "../assets/lam-wheelchair.png";
+import lamDaughterPushUrl from "../assets/lam-daughter-push.png";
 import npcSpritesheetUrl from "../assets/npc-spritesheet.png";
 import { audioDirector } from "./audio";
-import { composeRepeatText, OBJECTIVES, OLD_CITY_CROSSING, OLD_CITY_HANDRAIL, PATHS, REVEAL_PROFILE, SCENE_LABELS, TACTILE_LIT_MS } from "./content";
-import { CROSSING_TILEMAP } from "./crossing-map";
+import { composeRepeatText, OBJECTIVES, OLD_CITY_CROSSING, PATHS, REVEAL_PROFILE, SCENE_LABELS, TACTILE_LIT_MS } from "./content";
 import { ensureCaneTextures, preloadEnvironmentAssets, renderBusBellDecoration, renderMapDecoration, type EnvironmentSprite } from "./environment-art";
 import { gameEvents } from "./events";
-import { BELL_ANNOUNCEMENT_DELAY_MS, BELL_WINDOW_MS, constrainCrossingPosition, determineEnding, mergeColorMemory, resumePointForStage, transitionBus, transitionCrossing } from "./flow";
+import { BELL_ANNOUNCEMENT_DELAY_MS, BELL_WINDOW_MS, constrainCrossingPosition, determineEnding, mergeColorMemory, resumePointForStage, shouldStartWheelchairProcession, transitionBus, transitionCrossing } from "./flow";
 import { deterministicTileVariant, ensureGroundTextures, GROUND_TEXTURE, type GroundTileKey, type GroundVisualState } from "./ground-tiles";
 import { BUS_BELL_DETECTION_RADIUS, BUS_CARD_READER, BUS_DRIVER_SEAT, BUS_INTERIOR_DOOR, BUS_INTERIOR_TILEMAP, BUS_SEATED_SPRITE_KEYS, BUS_SEAT_SPOTS, isBusBellInRange, pickBusBellSpot, type BusBellSpot, type BusSeatSpot } from "./businterior-map";
 import { BUS_STOP_DECOY_SIGNS, BUS_STOP_DOOR, BUS_STOP_GATE_ENTRY, BUS_STOP_PATH_START, BUS_STOP_SIGN, BUS_STOP_SIGN_PROBE_RADIUS, BUS_STOP_TILEMAP } from "./busstop-map";
-import { MAP_TILE_SIZE, OLD_CITY_TILEMAP } from "./oldcity-map";
+import { MAP_TILE_SIZE, OLD_CITY_MEMORY_POINT, OLD_CITY_TILEMAP, SHOP_SIGNS } from "./oldcity-map";
 import { NPC_DEFINITIONS, type NpcDefinition } from "./npcs";
-import { RUINS_TILEMAP } from "./ruins-map";
+import { RUINS_DAUGHTER_END, RUINS_DAUGHTER_START, RUINS_LAM_END, RUINS_LAM_START, RUINS_PLAYER_END, RUINS_PLAYER_START, RUINS_PROCESSION_DURATION_MS, RUINS_TILEMAP, ruinsProcessionPositions } from "./ruins-map";
 import { collectMemory, finishGame, getActiveElapsedMs, getSnapshot, patchSnapshot, setCheckpoint, unlockTip } from "./store";
 import { ensureTactileTextures, TACTILE_TEXTURE } from "./tactile-layer";
 import { describeDecisionBrick, rasterizeTactilePath, type TactileBrick } from "./tactile-tiles";
@@ -68,6 +68,7 @@ function solidSurfaceLabel(kind: MapDecoration["kind"]): string {
   if (kind === "bus-driver-seat") return "司机座位：前方是驾驶区，请绕行";
   if (kind === "bus-seat-row") return "座椅边缘：实心座位，请绕行";
   if (kind === "bus-rail") return "扶杆：金属立柱，请绕行";
+  if (kind === "ramp-rail") return "坡道护栏：金属边界，请沿中央坡道前进";
   if (kind === "stop-sign-17" || kind === "stop-sign-25") return "站牌立柱：金属立杆，牌面在上方";
   return "实心障碍物：请绕行";
 }
@@ -139,8 +140,11 @@ abstract class WalkScene extends Phaser.Scene {
     if (!this.textures.exists("npc-spritesheet")) {
       this.load.spritesheet("npc-spritesheet", npcSpritesheetUrl, { frameWidth: 362, frameHeight: 362 });
     }
-    if (!this.textures.exists("lam")) {
-      this.load.spritesheet("lam", lamUrl, { frameWidth: 64, frameHeight: 64 });
+    if (!this.textures.exists("lam-wheelchair")) {
+      this.load.spritesheet("lam-wheelchair", lamWheelchairUrl, { frameWidth: 64, frameHeight: 64 });
+    }
+    if (!this.textures.exists("lam-daughter-push")) {
+      this.load.spritesheet("lam-daughter-push", lamDaughterPushUrl, { frameWidth: 64, frameHeight: 64 });
     }
   }
 
@@ -463,8 +467,7 @@ abstract class WalkScene extends Phaser.Scene {
 
   private renderNpcs(): void {
     NPC_DEFINITIONS.filter((definition) => definition.scene === this.sceneId).forEach((definition) => {
-      const frame = definition.scene === "old-city" ? 0 : 4;
-      const sprite = this.add.sprite(definition.x, definition.y, "npc-spritesheet", frame).setScale(0.16).setDepth(definition.y + 1);
+      const sprite = this.add.sprite(definition.x, definition.y, "npc-spritesheet", definition.frame).setScale(0.16).setDepth(definition.y + 1);
       if (!getSnapshot().settings.reducedMotion) this.tweens.add({ targets: sprite, y: definition.y - 2, duration: 760, yoyo: true, repeat: -1 });
       this.npcSprites.push({ definition, sprite });
     });
@@ -564,7 +567,7 @@ abstract class WalkScene extends Phaser.Scene {
       this.player.setAngle(this.facing === "left" ? -4 : 4);
       this.time.delayedCall(140, () => this.player.setAngle(0));
     }
-    if (Phaser.Input.Keyboard.JustDown(this.keys.hint) && time >= this.hintCooldownUntil) {
+    if (Phaser.Input.Keyboard.JustDown(this.keys.hint) && !this.controlsLocked() && time >= this.hintCooldownUntil) {
       this.revealMode = "hint";
       this.revealUntil = time + REVEAL_PROFILE.hintDurationMs;
       this.hintCooldownUntil = time + REVEAL_PROFILE.hintCooldownMs;
@@ -741,6 +744,7 @@ abstract class WalkScene extends Phaser.Scene {
     if (tile === "wall" || tile === "building" || tile === "fence" || tile === "bush") return { kind: "obstacle", label: "前方是阻挡物：请停下并回到凸纹", point: tip };
     if (tile === "dirt") return { kind: "stone", label: "碎土：材质与主路不同", point: tip };
     if (tile === "bus-seat") return { kind: "seat", label: "座位边缘：先确认软垫与金属框", point: tip };
+    if (tile === "zebra") return { kind: "stone", label: "斑马线涂装：过街区，请沿信号提示直行", point: tip };
     if (tile === "asphalt" || tile === "lane") return { kind: "stone", label: "粗糙沥青：前方是机动车道", point: tip };
     if (tile === "drain" || tile === "manhole") return { kind: "metal", label: "排水金属纹：靠近路缘，请留意车流", point: tip };
     return { kind: "stone", label: tile === "concrete" || tile === "sidewalk" ? "人行道铺面：没有连续凸纹" : "普通石板：没有连续凸纹", point: tip };
@@ -1253,7 +1257,7 @@ export class BusInteriorScene extends WalkScene {
     const arrived = transitionBus(riding, "arrive");
     const alighted = transitionBus(arrived, "alight");
     collectMemory("bus-rain");
-    patchSnapshot({ busState: alighted, scene: "old-city", objectiveId: "follow-old-city-path", resumeStage: "old-city-entry" });
+    patchSnapshot({ busState: alighted, scene: "old-city", objectiveId: "request-crossing", resumeStage: "old-city-entry" });
     gameEvents.emit("chapter", { from: "bus-interior", to: "old-city" });
     // The React tip layer resumes the paused scene immediately after emitting
     // tipClosed. Let that resume finish before starting the next Phaser scene.
@@ -1367,7 +1371,7 @@ export class BusRideScene extends Phaser.Scene {
     // Skipping the ride before the 10.5s narration must not cost the memory.
     collectMemory("bus-rain");
     const arrived = transitionBus(getSnapshot().busState, "arrive");
-    patchSnapshot({ busState: arrived, scene: "old-city", objectiveId: "follow-old-city-path", resumeStage: "old-city-entry" });
+    patchSnapshot({ busState: arrived, scene: "old-city", objectiveId: "request-crossing", resumeStage: "old-city-entry" });
     gameEvents.emit("chapter", { from: "bus-ride", to: "old-city" });
     this.scene.start("old-city");
   }
@@ -1375,14 +1379,14 @@ export class BusRideScene extends Phaser.Scene {
 
 export class OldCityScene extends WalkScene {
   protected sceneId = "old-city" as const;
-  protected spawn = new Phaser.Math.Vector2(328, 284);
-  protected objectiveId = "follow-old-city-path";
-  private railHeld = false;
-  private railRevealedUntil = 0;
-  private railBase!: Phaser.GameObjects.Graphics;
-  private railReveal!: Phaser.GameObjects.Graphics;
+  protected spawn = new Phaser.Math.Vector2(40, 284);
+  protected objectiveId = "request-crossing";
+  private crossingState: CrossingState = "approach";
+  private signalGraphics!: Phaser.GameObjects.Graphics;
+  private guideGraphics!: Phaser.GameObjects.Graphics;
   private leaving = false;
   private deadEndFound = false;
+  private petTipOpen = false;
 
   constructor() {
     super("old-city");
@@ -1394,192 +1398,40 @@ export class OldCityScene extends WalkScene {
 
   protected onSceneReady(): void {
     if (getSnapshot().busState === "arrived") patchSnapshot({ busState: transitionBus("arrived", "alight") });
-    this.railBase = this.add.graphics().setDepth(12);
-    this.railReveal = this.add.graphics().setDepth(15);
-    this.drawRail(this.railBase, 0x5f6662, 0.92);
-    if (getSnapshot().resumeStage === "old-city-rail") this.railRevealedUntil = this.time.now + 4500;
-    this.announce("你在白鸽巢下车。城市是灰色的；用 Space 敲击面前的一根盲杖，触碰过的地方会留下暖色记忆。");
-  }
-
-  protected getMovementInput(): Phaser.Math.Vector2 {
-    if (!this.railHeld) return super.getMovementInput();
-    const amount = Number(this.keys.up.isDown || this.keys.arrowUp.isDown) - Number(this.keys.down.isDown || this.keys.arrowDown.isDown);
-    if (!amount) return new Phaser.Math.Vector2();
-    const direction = new Phaser.Math.Vector2(
-      OLD_CITY_HANDRAIL.end.x - OLD_CITY_HANDRAIL.start.x,
-      OLD_CITY_HANDRAIL.end.y - OLD_CITY_HANDRAIL.start.y,
-    ).normalize();
-    return direction.scale(amount);
-  }
-
-  protected requiresBrightGround(): boolean {
-    return !this.railHeld;
-  }
-
-  protected onGuidedPath(): boolean {
-    return this.railHeld || super.onGuidedPath();
-  }
-
-  protected constrainMovement(current: Phaser.Math.Vector2, next: Phaser.Math.Vector2): Phaser.Math.Vector2 {
-    const bounded = super.constrainMovement(current, next);
-    if (this.railHeld) return projectToSegment(bounded, OLD_CITY_HANDRAIL.start, OLD_CITY_HANDRAIL.end).point;
-    return bounded;
-  }
-
-  protected suspendRouteTracking(): boolean {
-    const distance = projectToSegment(new Phaser.Math.Vector2(this.player.x, this.player.y), OLD_CITY_HANDRAIL.start, OLD_CITY_HANDRAIL.end).distance;
-    return this.railHeld || distance < 46;
-  }
-
-  protected repeatTaskText(): string {
-    if (this.railHeld) return "当前任务：按 W 沿扶手前进，按 S 后退，按 E 可以松开。";
-    if (this.objectiveId === "follow-handrail") return "当前任务：用 Space 敲击确认金属扶手，靠近后按 E 握住。";
-    return "当前任务：用一根盲杖判断四纹和点阵；支路不对时请自己返回，Q 可显示目标方向。";
-  }
-
-  protected decisionHint(nodeIndex: number): string {
-    if (this.path?.nodes[nodeIndex]?.taskId === "follow-old-city-path") return "4×4凸点：盲道在此暂停，右侧有金属扶手";
-    return super.decisionHint(nodeIndex);
-  }
-
-  protected onSurfaceContact(surface: CaneSurface, time: number): void {
-    if (surface.kind === "metal") this.revealRail(time);
-    if (surface.kind === "obstacle" && !this.deadEndFound) {
-      this.deadEndFound = true;
-      collectMemory("old-city-bell");
-      this.announce("杖头碰到封闭围栏，脚下也没有连续凸纹。这是短支路，请转身返回刚才的点阵。");
-    }
-  }
-
-  protected detectSceneSurface(tip: Phaser.Math.Vector2): CaneSurface | null {
-    const npc = this.nearestNpc(tip, 24);
-    if (npc) return { kind: "person", label: `${npc.definition.idleLabel}：按 E 询问方向`, point: new Phaser.Math.Vector2(npc.definition.x, npc.definition.y) };
-    const rail = projectToSegment(tip, OLD_CITY_HANDRAIL.start, OLD_CITY_HANDRAIL.end);
-    if (rail.distance <= 9) return { kind: "metal", label: "金属扶手：可靠近后按 E 握住", point: rail.point };
-    return null;
-  }
-
-  protected updateInteraction(time: number): void {
-    this.railReveal.clear();
-    if (time < this.railRevealedUntil || this.railHeld) this.drawRail(this.railReveal, OLD_CITY_HANDRAIL.revealColor, 1);
-
-    const memory = { x: 500, y: 230 };
-    const nearMemory = this.isNear(memory.x, memory.y, 30) && !getSnapshot().memories.includes("old-city-bell");
-    const railProjection = projectToSegment(new Phaser.Math.Vector2(this.player.x, this.player.y), OLD_CITY_HANDRAIL.start, OLD_CITY_HANDRAIL.end);
-    const nearRail = railProjection.distance <= OLD_CITY_HANDRAIL.engageRadius;
-    const railVisible = time < this.railRevealedUntil || this.railHeld;
-
-    this.prompt = nearMemory
-      ? "E  聆听记忆回声"
-      : this.railHeld
-        ? "E  松开扶手"
-        : nearRail
-          ? railVisible ? "E  握住扶手" : "Space 敲击寻找扶手"
-          : "";
-
-    if (nearMemory && this.interactionPressed()) {
-      collectMemory("old-city-bell");
-      audioDirector.interact();
-      this.announce("记忆回声：支路尽头传来钟声。林伯笑说，会走错路也算澳门的一部分。");
-      return;
-    }
-
-    if (this.railHeld && this.interactionPressed()) {
-      this.railHeld = false;
-      audioDirector.interact();
-      this.announce("你松开扶手。需要时可以再次用 Space 敲击确认它的位置。");
-      return;
-    }
-
-    if (!this.railHeld && nearRail && railVisible && this.interactionPressed()) {
-      this.railHeld = true;
-      this.objectiveId = "follow-handrail";
-      this.player.setPosition(railProjection.point.x, railProjection.point.y);
-      setCheckpoint("old-city-rail");
-      audioDirector.interact();
-      this.announce("你握住右侧扶手。按 W 前进，按 S 后退，按 E 松开。");
-      return;
-    }
-
-    if (this.railHeld && railProjection.t >= 0.97 && !this.leaving) {
-      this.leaving = true;
-      this.railHeld = false;
-      this.player.setPosition(OLD_CITY_HANDRAIL.end.x, OLD_CITY_HANDRAIL.end.y);
-      patchSnapshot({ scene: "old-city-crossing", objectiveId: "request-crossing", resumeStage: "crossing-approach" });
-      this.announce("扶手在点阵砖旁结束。前方是直行斑马线，请先到路缘请求通行。");
-      this.time.delayedCall(700, () => { gameEvents.emit("chapter", { from: "old-city", to: "old-city-crossing" }); this.scene.start("old-city-crossing"); });
-    }
-  }
-
-  private revealRail(time: number): void {
-    const projection = projectToSegment(new Phaser.Math.Vector2(this.player.x, this.player.y), OLD_CITY_HANDRAIL.start, OLD_CITY_HANDRAIL.end);
-    if (projection.distance > 150) return;
-    this.railRevealedUntil = time + 4500;
-    audioDirector.caneTap("metal");
-  }
-
-  private drawRail(graphics: Phaser.GameObjects.Graphics, color: number, alpha: number): void {
-    const { start, end } = OLD_CITY_HANDRAIL;
-    graphics.lineStyle(5, color, alpha);
-    graphics.lineBetween(start.x, start.y, end.x, end.y);
-    graphics.fillStyle(color, alpha);
-    [0, 0.5, 1].forEach((t) => {
-      const x = Phaser.Math.Linear(start.x, end.x, t);
-      const y = Phaser.Math.Linear(start.y, end.y, t);
-      graphics.fillRect(x - 2, y - 2, 4, 11);
+    const closeTip = gameEvents.on("tipClosed", (tip) => {
+      if (tip.source !== "pet-shop" || tip.id !== "guide-dog-access") return;
+      this.petTipOpen = false;
+      this.objectiveId = "reach-terminus";
+      patchSnapshot({ objectiveId: "reach-terminus" });
+      this.announce("盲道向北继续，银号门前就是街口终点。");
     });
-  }
-}
-
-export class OldCityCrossingScene extends WalkScene {
-  protected sceneId = "old-city-crossing" as const;
-  protected spawn = new Phaser.Math.Vector2(136, 316);
-  protected objectiveId = "request-crossing";
-  protected trackDetours = false;
-  private crossingState: CrossingState = "approach";
-  private signalGraphics!: Phaser.GameObjects.Graphics;
-  private guideGraphics!: Phaser.GameObjects.Graphics;
-  private leaving = false;
-
-  constructor() {
-    super("old-city-crossing");
-  }
-
-  protected onSceneReady(): void {
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, closeTip);
+    this.events.once(Phaser.Scenes.Events.DESTROY, closeTip);
     this.signalGraphics = this.add.graphics().setDepth(17);
     this.guideGraphics = this.add.graphics().setDepth(14);
-    if (getSnapshot().resumeStage === "crossing-wait") this.crossingState = "requested";
-    if (getSnapshot().resumeStage === "crossing-go") this.crossingState = "walk";
+    const stage = getSnapshot().resumeStage;
+    if (stage === "old-city-wait") this.crossingState = "requested";
+    if (stage === "old-city-go") this.crossingState = "walk";
+    if (stage === "old-city-street") this.crossingState = "crossed";
     this.drawSignal();
     if (this.crossingState === "requested") {
       this.announce("通行请求已经记录。请留在路缘，重新等待可通行提示。");
       this.scheduleCrossingWait();
     } else if (this.crossingState === "walk") {
-      this.announce("可以通行。沿垂直斑马线直行到对岸，再向右转。");
-    } else this.announce("前方是直行路口。沿盲道到点阵处，按 E 请求通行。");
-  }
-
-  protected tileMap(): TileMapDefinition | null {
-    return CROSSING_TILEMAP;
-  }
-
-  protected decisionHint(nodeIndex: number): string {
-    const taskId = this.path?.nodes[nodeIndex]?.taskId;
-    if (taskId === "request-crossing") return "4×4凸点：前方是路缘，可按 E 请求通行";
-    if (taskId === "cross-junction") return "4×4凸点：对岸路缘，盲道向前继续";
-    if (taskId === "leave-crossing") return "4×4凸点：沿对岸人行道离开路口";
-    return super.decisionHint(nodeIndex);
-  }
-
-  protected repeatTaskText(): string {
-    if (this.crossingState === "requested") return "当前任务：留在点阵砖旁等待；收到文字和双音提示后再前进。";
-    if (this.crossingState === "walk") return "当前任务：可以通行。沿垂直斑马线直行到对岸，再向右转。";
-    if (this.crossingState === "crossed") return "当前任务：已经抵达对岸，请向右沿盲道离开路口。";
-    return "当前任务：向前到点阵砖，按 E 请求通行。斑马线直行通过路口。";
+      this.announce("可以通行。沿斑马线向东直行到对岸路缘。");
+    } else if (this.crossingState === "crossed") {
+      this.announce("你已经过了马路。沿盲道穿过商铺街——向南、向东、再向北。");
+    } else {
+      this.announce("你在白鸽巢下车。城市是灰色的；用 Space 敲击盲杖，先沿盲道向北，到路缘点阵按 E 请求通行。");
+    }
   }
 
   protected requiresBrightGround(): boolean {
-    return this.crossingState === "approach" || this.crossingState === "requested";
+    return this.crossingState !== "walk";
+  }
+
+  protected suspendRouteTracking(): boolean {
+    return this.crossingState === "walk";
   }
 
   protected constrainMovement(current: Phaser.Math.Vector2, next: Phaser.Math.Vector2): Phaser.Math.Vector2 {
@@ -1588,23 +1440,66 @@ export class OldCityCrossingScene extends WalkScene {
     return new Phaser.Math.Vector2(constrained.x, constrained.y);
   }
 
-  protected updateInteraction(): void {
+  protected repeatTaskText(): string {
+    if (this.crossingState === "requested") return "当前任务：留在点阵砖旁等待；收到文字和双音提示后再前进。";
+    if (this.crossingState === "walk") return "当前任务：可以通行。沿斑马线向东直行到对岸路缘。";
+    if (this.crossingState === "crossed") return "当前任务：沿盲道穿过商铺街——向南、向东、再向北；途中在猫记宠物门前按 E 了解导盲犬，再走到银号门前的终点；支路不对时请自己返回。";
+    return "当前任务：沿盲道向北到点阵砖，按 E 请求通行。Q 可显示目标方向。";
+  }
+
+  protected decisionHint(nodeIndex: number): string {
+    const taskId = this.path?.nodes[nodeIndex]?.taskId;
+    if (taskId === "request-crossing") return "4×4凸点：路缘请求点，可按 E 请求通行";
+    if (taskId === "cross-junction") return "4×4凸点：对岸路缘，右侧有新盲道向南";
+    if (taskId === "visit-pet-shop") return "4×4凸点：猫记宠物门前，可按 E 了解导盲犬";
+    if (taskId === "reach-terminus") return "4×4凸点：街口终点，前方通向大三巴";
+    return super.decisionHint(nodeIndex);
+  }
+
+  protected detectSceneSurface(tip: Phaser.Math.Vector2): CaneSurface | null {
+    const base = super.detectSceneSurface(tip);
+    if (base) return base;
+    const sign = SHOP_SIGNS.find((entry) => Phaser.Math.Distance.Between(tip.x, tip.y, entry.touch.x, entry.touch.y) <= 26);
+    if (sign) return { kind: "sign", label: sign.hint, point: new Phaser.Math.Vector2(sign.touch.x, sign.touch.y) };
+    return null;
+  }
+
+  protected onSurfaceContact(surface: CaneSurface, _time: number): void {
+    if (surface.kind !== "obstacle" || this.deadEndFound) return;
+    if (Phaser.Math.Distance.Between(surface.point.x, surface.point.y, OLD_CITY_MEMORY_POINT.x, OLD_CITY_MEMORY_POINT.y) > 48) return;
+    this.deadEndFound = true;
+    collectMemory("old-city-bell");
+    this.announce("杖头碰到封闭围栏，脚下是碎土。这是商铺间的短巷，请转身返回商铺街的盲道。");
+  }
+
+  protected updateInteraction(_time: number): void {
+    this.drawCrossingGuide();
     const request = OLD_CITY_CROSSING.requestPoint;
     const nearRequest = this.isNear(request.x, request.y, 34);
-    this.drawCrossingGuide();
+    const nearMemory = this.isNear(OLD_CITY_MEMORY_POINT.x, OLD_CITY_MEMORY_POINT.y, 30) && !getSnapshot().memories.includes("old-city-bell");
 
-    this.prompt = this.crossingState === "approach" && nearRequest
-      ? "E  请求通行"
-      : this.crossingState === "requested"
-        ? "请留在路缘等候"
-        : this.crossingState === "walk"
-          ? "沿直线斑马线通过"
-          : "";
+    this.prompt = nearMemory
+      ? "E  聆听记忆回声"
+      : this.crossingState === "approach" && nearRequest
+        ? "E  请求通行"
+        : this.crossingState === "requested"
+          ? "请留在路缘等候"
+          : this.crossingState === "walk"
+            ? "沿斑马线向东通过"
+            : "";
+
+    if (nearMemory && this.interactionPressed()) {
+      this.deadEndFound = true;
+      collectMemory("old-city-bell");
+      audioDirector.interact();
+      this.announce("记忆回声：小巷尽头传来饼家的风铃。林伯笑说，会走错路也算澳门的一部分。");
+      return;
+    }
 
     if (this.crossingState === "approach" && nearRequest && this.interactionPressed()) {
       this.crossingState = transitionCrossing(this.crossingState, "request");
       this.objectiveId = "wait-crossing";
-      setCheckpoint("crossing-wait");
+      setCheckpoint("old-city-wait");
       audioDirector.crossingWait();
       this.announce("通行请求已收到。请留在路缘等候文字和双音提示。");
       this.drawSignal();
@@ -1614,17 +1509,45 @@ export class OldCityCrossingScene extends WalkScene {
 
     if (this.crossingState === "walk" && this.isNear(OLD_CITY_CROSSING.farCurb.x, OLD_CITY_CROSSING.farCurb.y, 30)) {
       this.crossingState = transitionCrossing(this.crossingState, "finish");
-      this.objectiveId = "leave-crossing";
-      patchSnapshot({ objectiveId: "leave-crossing" });
-      this.announce("你抵达对岸点阵。向右转，沿人行道盲道离开路口。");
+      this.objectiveId = "follow-street-south";
+      setCheckpoint("old-city-street");
+      this.drawSignal();
+      this.announce("你抵达对岸点阵。右侧出现新盲道，沿它向南进入商铺街。");
+      return;
     }
 
-    const exit = OBJECTIVES["leave-crossing"].target;
-    if (this.crossingState === "crossed" && this.isNear(exit.x, exit.y, 30) && !this.leaving) {
+    if (this.crossingState !== "crossed" || this.leaving) return;
+    const southTurn = OBJECTIVES["follow-street-south"].target;
+    if (this.objectiveId === "follow-street-south" && this.isNear(southTurn.x, southTurn.y, 30)) {
+      this.objectiveId = "follow-street-east";
+      patchSnapshot({ objectiveId: "follow-street-east" });
+      this.announce("商铺街口的点阵。盲道向东继续，两侧是骑楼商铺。");
+      return;
+    }
+    const eastTurn = OBJECTIVES["follow-street-east"].target;
+    if (this.objectiveId === "follow-street-east" && this.isNear(eastTurn.x, eastTurn.y, 30)) {
+      this.objectiveId = "visit-pet-shop";
+      patchSnapshot({ objectiveId: "visit-pet-shop" });
+      this.announce("街尾的点阵。盲道向北转，宠物店就在右侧，先到门前停一停。");
+      return;
+    }
+    const petShop = OBJECTIVES["visit-pet-shop"].target;
+    if (this.objectiveId === "visit-pet-shop" && this.isNear(petShop.x, petShop.y, 30)) {
+      this.prompt = "E  了解导盲犬的处境";
+      if (!this.petTipOpen && this.interactionPressed()) {
+        audioDirector.interact();
+        this.petTipOpen = true;
+        unlockTip("guide-dog-access");
+        gameEvents.emit("tipOpen", { id: "guide-dog-access", source: "pet-shop" });
+      }
+      return;
+    }
+    const terminus = OBJECTIVES["reach-terminus"].target;
+    if (this.objectiveId === "reach-terminus" && this.isNear(terminus.x, terminus.y, 30)) {
       this.leaving = true;
       patchSnapshot({ scene: "ruins", objectiveId: "meet-lam", resumeStage: "ruins-entry" });
-      this.announce("路口已经在身后。前方盲道通向大三巴牌坊。");
-      this.time.delayedCall(650, () => { gameEvents.emit("chapter", { from: "old-city-crossing", to: "ruins" }); this.scene.start("ruins"); });
+      this.announce("银号门前的盲道到了尽头。前方街口通向大三巴牌坊。");
+      this.time.delayedCall(650, () => { gameEvents.emit("chapter", { from: "old-city", to: "ruins" }); this.scene.start("ruins"); });
     }
   }
 
@@ -1633,44 +1556,53 @@ export class OldCityCrossingScene extends WalkScene {
       if (this.crossingState !== "requested") return;
       this.crossingState = transitionCrossing(this.crossingState, "allow");
       this.objectiveId = "cross-junction";
-      setCheckpoint("crossing-go");
+      setCheckpoint("old-city-go");
       audioDirector.crossingWalk();
-      this.announce("可以通行。沿垂直斑马线直行到对岸，再向右转。");
+      this.announce("可以通行。沿斑马线向东直行到对岸路缘。");
       this.drawSignal();
     });
   }
 
+  /** Two pedestrian signals: one beside the west request point, one on the far curb. */
   private drawSignal(): void {
     if (!this.signalGraphics) return;
     this.signalGraphics.clear();
-    this.signalGraphics.lineStyle(4, 0x151c20, 1);
-    this.signalGraphics.lineBetween(235, 282, 235, 234);
-    this.signalGraphics.fillStyle(0x11171b, 1);
-    this.signalGraphics.fillRoundedRect(223, 220, 24, 34, 3);
     const color = this.crossingState === "walk" || this.crossingState === "crossed" ? 0x73c98b : 0xc85d52;
-    this.signalGraphics.fillStyle(color, 1);
-    this.signalGraphics.fillCircle(235, 237, 6);
+    [{ x: 24, base: 112 }, { x: 196, base: 150 }].forEach(({ x, base }) => {
+      const boxTop = base - 68;
+      this.signalGraphics.lineStyle(4, 0x151c20, 1);
+      this.signalGraphics.lineBetween(x, base, x, boxTop + 34);
+      this.signalGraphics.fillStyle(0x11171b, 1);
+      this.signalGraphics.fillRoundedRect(x - 12, boxTop, 24, 34, 3);
+      this.signalGraphics.fillStyle(color, 1);
+      this.signalGraphics.fillCircle(x, boxTop + 17, 6);
+    });
   }
 
+  /** While the walk phase lasts, the zebra tiles glow slightly instead of any vector guide line. */
   private drawCrossingGuide(): void {
     this.guideGraphics.clear();
     if (this.crossingState !== "walk") return;
     this.guideGraphics.fillStyle(0xffd477, 0.22);
-    CROSSING_TILEMAP.groundRows.forEach((row, rowIndex) => [...row].forEach((char, colIndex) => {
+    OLD_CITY_TILEMAP.groundRows.forEach((row, rowIndex) => [...row].forEach((char, colIndex) => {
       if (char !== "z") return;
-      this.guideGraphics.fillRect(colIndex * 16, rowIndex * 16 + CROSSING_TILEMAP.offsetY, 16, 16);
+      this.guideGraphics.fillRect(colIndex * 16, rowIndex * 16 + OLD_CITY_TILEMAP.offsetY, 16, 16);
     }));
   }
 }
 
 export class RuinsScene extends WalkScene {
   protected sceneId = "ruins" as const;
-  protected spawn = new Phaser.Math.Vector2(328, 284);
+  protected spawn = new Phaser.Math.Vector2(RUINS_PLAYER_START.x, RUINS_PLAYER_START.y);
   protected objectiveId = "meet-lam";
+  private processionStarted = false;
+  private processionActive = false;
+  private wheelchairTipOpen = false;
   private finaleStarted = false;
   private finaleFinished = false;
   private finaleGraphics!: Phaser.GameObjects.Graphics;
   private lam!: Phaser.GameObjects.Sprite;
+  private daughter!: Phaser.GameObjects.Sprite;
   private finaleStartedAt = 0;
   private finaleWarmProgress = 0;
   private finaleTier = 0;
@@ -1681,18 +1613,47 @@ export class RuinsScene extends WalkScene {
 
   protected onSceneReady(): void {
     this.finaleGraphics = this.add.graphics().setDepth(16);
-    this.lam = this.add.sprite(232, 108, "lam", 0).setTint(0x9b968d).setDepth(109);
+    this.lam = this.add.sprite(RUINS_LAM_START.x, RUINS_LAM_START.y, "lam-wheelchair", 0).setTint(0x9b968d);
     this.lam.setOrigin(0.5, 1);
-    if (!this.anims.exists("lam-finale")) {
+    this.daughter = this.add.sprite(RUINS_DAUGHTER_START.x, RUINS_DAUGHTER_START.y, "lam-daughter-push", 0).setTint(0x9b968d);
+    this.daughter.setOrigin(0.5, 1);
+    this.updateProcessionDepths();
+    if (!this.anims.exists("lam-wheelchair-roll")) {
       this.anims.create({
-        key: "lam-finale",
-        frames: this.anims.generateFrameNumbers("lam", { frames: [1, 1, 2, 2] }),
+        key: "lam-wheelchair-roll",
+        frames: this.anims.generateFrameNumbers("lam-wheelchair", { frames: [0, 1] }),
+        frameRate: 4,
+        repeat: -1,
+      });
+    }
+    if (!this.anims.exists("lam-wheelchair-finale")) {
+      this.anims.create({
+        key: "lam-wheelchair-finale",
+        frames: this.anims.generateFrameNumbers("lam-wheelchair", { frames: [2, 2, 0, 0] }),
         frameRate: 2,
         repeat: -1,
       });
     }
-    if (!getSnapshot().settings.reducedMotion) this.tweens.add({ targets: this.lam, y: 106, duration: 900, yoyo: true, repeat: -1 });
-    this.announce("牌坊前的台阶反着灯光。林伯就在盲道尽头等你。");
+    if (!this.anims.exists("lam-daughter-push-walk")) {
+      this.anims.create({
+        key: "lam-daughter-push-walk",
+        frames: this.anims.generateFrameNumbers("lam-daughter-push", { frames: [1, 2] }),
+        frameRate: 5,
+        repeat: -1,
+      });
+    }
+    const closeTip = gameEvents.on("tipClosed", (tip) => {
+      if (!shouldStartWheelchairProcession(tip)) return;
+      this.wheelchairTipOpen = false;
+      this.time.delayedCall(0, () => this.startProcession());
+    });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, closeTip);
+    this.events.once(Phaser.Scenes.Events.DESTROY, closeTip);
+    if (getSnapshot().resumeStage === "ruins-procession") {
+      this.time.delayedCall(0, () => this.startProcession());
+      return;
+    }
+    this.announce("路边传来轮椅轻响。林伯和女儿正在中央坡道入口等你。");
   }
 
   protected tileMap(): TileMapDefinition | null {
@@ -1700,15 +1661,28 @@ export class RuinsScene extends WalkScene {
   }
 
   protected getMovementInput(): Phaser.Math.Vector2 {
-    return this.finaleStarted ? new Phaser.Math.Vector2() : super.getMovementInput();
+    return this.processionActive || this.finaleStarted ? new Phaser.Math.Vector2() : super.getMovementInput();
+  }
+
+  protected controlsLocked(): boolean {
+    return this.processionActive || this.finaleStarted || super.controlsLocked();
+  }
+
+  protected suspendRouteTracking(): boolean {
+    return this.processionActive || this.finaleStarted;
   }
 
   protected decisionHint(nodeIndex: number): string {
-    if (this.path?.nodes[nodeIndex]?.taskId === "meet-lam") return "4×4凸点：台阶在前，林伯在盲道尽头等你";
+    if (this.path?.nodes[nodeIndex]?.taskId === "meet-lam") return "4×4凸点：林伯的轮椅就在坡道入口前";
+    if (this.path?.nodes[nodeIndex]?.taskId === "follow-wheelchair") return "4×4凸点：中央坡道抵达牌坊平台";
     return super.decisionHint(nodeIndex);
   }
 
   protected updateInteraction(): void {
+    if (this.processionActive) {
+      this.prompt = "正紧随林伯和女儿沿坡道上行";
+      return;
+    }
     if (this.finaleStarted) {
       this.drawFinaleWave();
       this.prompt = "正在回放触碰过的暖色记忆";
@@ -1716,14 +1690,65 @@ export class RuinsScene extends WalkScene {
     }
     const target = OBJECTIVES[this.objectiveId].target;
     const near = this.isNear(target.x, target.y, 38);
-    this.prompt = near ? "E  回应林伯" : "";
-    if (near && this.interactionPressed()) {
+    this.prompt = near ? "E  问候林伯并查看轮椅推行贴士" : "";
+    if (near && !this.wheelchairTipOpen && this.interactionPressed()) {
       audioDirector.interact();
-      this.startFinale();
+      this.wheelchairTipOpen = true;
+      unlockTip("wheelchair-pushing");
+      gameEvents.emit("tipOpen", { id: "wheelchair-pushing", source: "wheelchair" });
     }
   }
 
+  private startProcession(): void {
+    if (this.processionStarted || this.finaleStarted) return;
+    this.processionStarted = true;
+    this.processionActive = true;
+    this.objectiveId = "follow-wheelchair";
+    setCheckpoint("ruins-procession");
+    this.setProcessionPositions(0);
+    this.facing = "up";
+    this.player.setTexture("traveler-walk", FACE_FRAME.up).setAngle(0);
+    this.caneSprite.setVisible(true);
+    const reducedMotion = getSnapshot().settings.reducedMotion;
+    this.announce(reducedMotion
+      ? "女儿稳稳推着林伯到达牌坊前，你紧随其后。"
+      : "女儿说明要沿中央坡道上行。她稳稳推着林伯，你紧随其后。");
+    if (reducedMotion) {
+      this.setProcessionPositions(1);
+      this.time.delayedCall(250, () => this.startFinale());
+      return;
+    }
+    this.lam.play("lam-wheelchair-roll");
+    this.daughter.play("lam-daughter-push-walk");
+    this.player.play("walk-up", true);
+    this.tweens.addCounter({
+      from: 0,
+      to: 1,
+      duration: RUINS_PROCESSION_DURATION_MS,
+      ease: "Sine.inOut",
+      onUpdate: (tween) => this.setProcessionPositions(Number(tween.getValue() ?? 0)),
+      onComplete: () => this.startFinale(),
+    });
+  }
+
+  private setProcessionPositions(progress: number): void {
+    const positions = ruinsProcessionPositions(progress);
+    this.lam.setPosition(positions.lam.x, positions.lam.y);
+    this.daughter.setPosition(positions.daughter.x, positions.daughter.y);
+    this.player.setPosition(positions.player.x, positions.player.y);
+    this.updateProcessionDepths();
+  }
+
+  private updateProcessionDepths(): void {
+    this.lam.setDepth(this.lam.y + 1);
+    this.daughter.setDepth(this.daughter.y + 2);
+    this.player.setDepth(this.player.y + 3);
+  }
+
   private startFinale(): void {
+    if (this.finaleStarted) return;
+    this.setProcessionPositions(1);
+    this.processionActive = false;
     this.finaleStarted = true;
     this.finaleStartedAt = this.time.now;
     this.prompt = "正在回放触碰过的暖色记忆";
@@ -1732,16 +1757,21 @@ export class RuinsScene extends WalkScene {
     const reducedMotion = snapshot.settings.reducedMotion;
     if (reducedMotion) {
       this.lam.setFrame(2);
+      this.daughter.setFrame(0);
       this.drawFinaleWave(true);
       this.time.delayedCall(250, () => this.finishFinale());
       return;
     }
-    this.lam.play("lam-finale");
+    this.player.anims.stop();
+    this.player.setFrame(FACE_FRAME.up);
+    this.daughter.anims.stop();
+    this.daughter.setFrame(0);
+    this.lam.play("lam-wheelchair-finale");
     const line = this.finaleTier >= 3
       ? "一路留下的三段记忆同时亮起：道路、石墙、房屋和牌坊都恢复了雨后的暖色。"
       : this.finaleTier === 2
-        ? "盲道的暖光爬上石墙与两侧房屋，林伯在台阶前向你挥手。"
-        : "盲道、林伯和牌坊先亮了起来，足够照见约定的终点。";
+        ? "盲道的暖光爬上石墙与两侧房屋，林伯在轮椅上向你挥手。"
+        : "盲道、林伯、女儿和牌坊先亮了起来，足够照见约定的终点。";
     this.time.delayedCall(850, () => this.announce(line));
     this.time.delayedCall(2100, () => this.finishFinale());
   }
@@ -1754,11 +1784,12 @@ export class RuinsScene extends WalkScene {
     this.finaleGraphics.fillStyle(0xe0bd72, 0.1 + progress * 0.16);
     this.finaleGraphics.fillCircle(this.lam.x, this.lam.y - 24, 18 + progress * 28);
     this.lam.setTint(progress >= 0.35 ? 0xd7a85d : 0x9b968d);
+    this.daughter.setTint(progress >= 0.55 ? 0xc9a36c : 0x9b968d);
   }
 
   protected forceWarmForTile(tile: { x: number; y: number; environment: boolean }): boolean {
     if (!this.finaleStarted || this.finaleWarmProgress <= 0) return false;
-    const distance = Phaser.Math.Distance.Between(tile.x, tile.y, this.lam?.x ?? 232, this.lam?.y ?? 108);
+    const distance = Phaser.Math.Distance.Between(tile.x, tile.y, this.lam?.x ?? RUINS_LAM_END.x, this.lam?.y ?? RUINS_LAM_END.y);
     const route = PATHS.ruins.nodes.some((node, index, nodes) => index < nodes.length - 1 && pointSegmentDistance(new Phaser.Math.Vector2(tile.x, tile.y), node, nodes[index + 1]) <= 25);
     if (this.finaleTier >= 3) return distance <= this.finaleWarmProgress * 720;
     if (this.finaleTier === 2) return (route || tile.environment) && distance <= this.finaleWarmProgress * 520;

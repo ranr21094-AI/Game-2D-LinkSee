@@ -1,4 +1,4 @@
-export type SceneId = "bus-stop" | "bus-interior" | "bus-ride" | "old-city" | "old-city-crossing" | "ruins";
+export type SceneId = "bus-stop" | "bus-interior" | "bus-ride" | "old-city" | "ruins";
 
 export type TilePoint = { x: number; y: number };
 
@@ -20,15 +20,6 @@ export type TactilePathNode = TilePoint & {
 export type TactilePathDefinition = {
   scene: SceneId;
   nodes: TactilePathNode[];
-};
-
-export type GuideRailDefinition = {
-  id: string;
-  scene: SceneId;
-  start: TilePoint;
-  end: TilePoint;
-  engageRadius: number;
-  revealColor: number;
 };
 
 export type CrossingState = "approach" | "requested" | "walk" | "crossed";
@@ -73,7 +64,7 @@ export type BusTransitState =
 
 export type MemoryId = "bus-rain" | "old-city-bell" | "border-hand";
 export type EndingId = "reunion" | "detour" | "return";
-export type TipId = "sighted-guide" | "bus-access" | "bus-ride-access";
+export type TipId = "sighted-guide" | "bus-access" | "bus-ride-access" | "wheelchair-pushing" | "guide-dog-access";
 
 export type TipDefinition = {
   id: TipId;
@@ -98,8 +89,6 @@ export type GameSettings = {
   gameMode: GameMode;
 };
 
-export type LegacyGameSettings = Omit<GameSettings, "ambientVolume" | "gameMode">;
-
 export type ResumeStage =
   | "bus-stop-entry"
   | "bus-stop-sign"
@@ -108,30 +97,14 @@ export type ResumeStage =
   | "bus-interior-bell"
   | "bus-ride"
   | "old-city-entry"
-  | "old-city-rail"
-  | "crossing-approach"
-  | "crossing-wait"
-  | "crossing-go"
-  | "ruins-entry";
+  | "old-city-wait"
+  | "old-city-go"
+  | "old-city-street"
+  | "ruins-entry"
+  | "ruins-procession";
 
-export type GameSnapshotV2 = {
-  version: 2;
-  objectiveId: string;
-  scene: SceneId;
-  busState: BusTransitState;
-  selectedSeatId: string | null;
-  memories: MemoryId[];
-  detourScore: number;
-  startedAt: number;
-  elapsedBeforeResume: number;
-  returnRequested: boolean;
-  ending: EndingId | null;
-  colorMemory: ColorMemoryPoint[];
-  settings: LegacyGameSettings;
-};
-
-export type GameSnapshotV3 = {
-  version: 3;
+export type GameSnapshotV4 = {
+  version: 4;
   mobilityGuideSeen: boolean;
   unlockedTips: TipId[];
   objectiveId: string;

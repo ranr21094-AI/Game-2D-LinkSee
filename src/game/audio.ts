@@ -12,8 +12,7 @@ const SCENE_AMBIENCE: Record<SceneId, Partial<Record<AmbientId, number>>> = {
   "bus-stop": { rain: 0.5, traffic: 0.34 },
   "bus-interior": { bus: 0.56 },
   "bus-ride": { bus: 0.62, rain: 0.18 },
-  "old-city": { rain: 0.42, traffic: 0.12 },
-  "old-city-crossing": { rain: 0.32, traffic: 0.58 },
+  "old-city": { rain: 0.4, traffic: 0.5 },
   ruins: { rain: 0.34, traffic: 0.08 },
 };
 

@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { audioDirector } from "./audio";
-import { BusInteriorScene, BusRideScene, BusStopScene, OldCityCrossingScene, OldCityScene, RuinsScene } from "./scenes";
+import { BusInteriorScene, BusRideScene, BusStopScene, OldCityScene, RuinsScene } from "./scenes";
 import { pauseActiveTimer, resumeActiveTimer } from "./store";
 import type { SceneId } from "./types";
 
@@ -17,13 +17,12 @@ function sceneKey(scene: SceneId): string {
 export function startGame(parent: string, initialScene: SceneId): Phaser.Game {
   destroyGame();
   manuallyPaused = false;
-  const classes = [BusStopScene, BusInteriorScene, BusRideScene, OldCityScene, OldCityCrossingScene, RuinsScene];
+  const classes = [BusStopScene, BusInteriorScene, BusRideScene, OldCityScene, RuinsScene];
   const classByScene: Record<SceneId, (typeof classes)[number]> = {
     "bus-stop": BusStopScene,
     "bus-interior": BusInteriorScene,
     "bus-ride": BusRideScene,
     "old-city": OldCityScene,
-    "old-city-crossing": OldCityCrossingScene,
     ruins: RuinsScene,
   };
   const initialClass = classByScene[initialScene] ?? BusStopScene;

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { BUS_INTERIOR_TILEMAP } from "./businterior-map";
 import { BUS_STOP_TILEMAP } from "./busstop-map";
 import { OBJECTIVES, PATHS } from "./content";
-import { CROSSING_TILEMAP } from "./crossing-map";
 import { deterministicTileVariant } from "./ground-tiles";
 import { OLD_CITY_TILEMAP } from "./oldcity-map";
 import { RUINS_TILEMAP } from "./ruins-map";
@@ -12,7 +11,6 @@ const MAPS: Record<string, TileMapDefinition> = {
   "bus-stop": BUS_STOP_TILEMAP,
   "bus-interior": BUS_INTERIOR_TILEMAP,
   "old-city": OLD_CITY_TILEMAP,
-  "old-city-crossing": CROSSING_TILEMAP,
   ruins: RUINS_TILEMAP,
 };
 
@@ -30,7 +28,7 @@ describe("complete scene maps", () => {
   });
 
   it("gives every outdoor map buildings, sidewalk, curb, drainage and road", () => {
-    [BUS_STOP_TILEMAP, OLD_CITY_TILEMAP, CROSSING_TILEMAP, RUINS_TILEMAP].forEach((map) => {
+    [BUS_STOP_TILEMAP, OLD_CITY_TILEMAP, RUINS_TILEMAP].forEach((map) => {
       const surfaces = new Set(Array.from({ length: 22 }, (_, row) => Array.from({ length: 40 }, (_, col) => tileAt(map, col, row))).flat());
       ["building", "sidewalk", "curb", "drain", "asphalt"].forEach((surface) => expect(surfaces.has(surface as never), `${map.id} missing ${surface}`).toBe(true));
     });
@@ -47,9 +45,9 @@ describe("complete scene maps", () => {
     });
   });
 
-  it("marks only the zebra corridor as a legal crossing through the arterial road", () => {
-    for (let row = 7; row <= 16; row += 1) for (let col = 0; col < 40; col += 1) {
-      expect(movementAt(CROSSING_TILEMAP, col, row)).toBe(col >= 16 && col <= 18 ? "crossing" : "road");
+  it("marks only the zebra band as a legal crossing through the vertical road", () => {
+    for (let row = 0; row < 22; row += 1) for (let col = 5; col <= 10; col += 1) {
+      expect(movementAt(OLD_CITY_TILEMAP, col, row)).toBe(row >= 6 && row <= 8 ? "crossing" : "road");
     }
   });
 

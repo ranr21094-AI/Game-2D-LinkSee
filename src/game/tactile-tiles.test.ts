@@ -43,10 +43,10 @@ describe("rasterizeTactilePath", () => {
     expect(bricks.some((brick) => brick.kind === "guidance" && Math.hypot(brick.x - 32, brick.y) < TACTILE_BRICK_SIZE * 0.75)).toBe(false);
   });
 
-  it("keeps guidance bricks out of the intentional old-city gap", () => {
+  it("keeps guidance bricks off the zebra gap between the two curbs", () => {
     const nodes = PATHS["old-city"].nodes;
-    const start = nodes.find((node) => node.taskId === "follow-old-city-path")!;
-    const end = nodes.find((node) => node.taskId === "follow-handrail")!;
+    const start = nodes.find((node) => node.taskId === "request-crossing")!;
+    const end = nodes.find((node) => node.taskId === "cross-junction")!;
     const guidance = rasterizeTactilePath(PATHS["old-city"]).filter((brick) => brick.kind === "guidance");
     [0.25, 0.5, 0.75].forEach((t) => {
       const point = { x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t };

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { OLD_CITY_CROSSING } from "./content";
-import { BELL_WINDOW_MS, checkpointForStage, COLOR_MEMORY_LIMIT, constrainCrossingPosition, determineEnding, mergeColorMemory, resumePointForStage, transitionBus, transitionCrossing } from "./flow";
+import { BELL_WINDOW_MS, checkpointForStage, COLOR_MEMORY_LIMIT, constrainCrossingPosition, determineEnding, mergeColorMemory, resumePointForStage, shouldStartWheelchairProcession, transitionBus, transitionCrossing } from "./flow";
+import { RUINS_DAUGHTER_END, RUINS_DAUGHTER_START, RUINS_LAM_END, RUINS_LAM_START, RUINS_PLAYER_END, RUINS_PLAYER_START, RUINS_PROCESSION_DURATION_MS, ruinsProcessionPositions } from "./ruins-map";
 
 describe("bus state machine", () => {
   it("keeps the free-exploration bus checkpoints explicit", () => {
@@ -46,17 +47,20 @@ describe("crossing state machine", () => {
   });
 
   it("restores the crossing at its safe request point", () => {
-    expect(checkpointForStage("crossing-wait")).toEqual({ scene: "old-city-crossing", objectiveId: "wait-crossing", resumeStage: "crossing-wait" });
-    expect(resumePointForStage("crossing-wait")).toEqual({ x: 280, y: 284 });
+    expect(checkpointForStage("old-city-wait")).toEqual({ scene: "old-city", objectiveId: "wait-crossing", resumeStage: "old-city-wait" });
+    expect(resumePointForStage("old-city-wait")).toEqual({ x: 40, y: 124 });
+    expect(checkpointForStage("old-city-street")).toEqual({ scene: "old-city", objectiveId: "follow-street-south", resumeStage: "old-city-street" });
+    expect(resumePointForStage("old-city-street")).toEqual({ x: 232, y: 124 });
   });
 
   it("blocks the roadway before permission and constrains the open crossing corridor", () => {
-    expect(constrainCrossingPosition("requested", { x: 410, y: 180 }, OLD_CITY_CROSSING)).toEqual({ x: 320, y: 280 });
+    expect(constrainCrossingPosition("requested", { x: 410, y: 180 }, OLD_CITY_CROSSING)).toEqual({ x: 56, y: 180 });
 
-    const constrained = constrainCrossingPosition("walk", { x: 420, y: 260 }, OLD_CITY_CROSSING);
-    expect(constrained.x).toBe(OLD_CITY_CROSSING.requestPoint.x + OLD_CITY_CROSSING.corridorWidth / 2);
-    expect(constrained.y).toBe(260);
-    expect(constrainCrossingPosition("walk", { x: 280, y: 20 }, OLD_CITY_CROSSING).y).toBe(108);
+    const constrained = constrainCrossingPosition("walk", { x: 300, y: 124 }, OLD_CITY_CROSSING);
+    expect(constrained.x).toBe(OLD_CITY_CROSSING.farCurb.x);
+    expect(constrained.y).toBe(124);
+    expect(constrainCrossingPosition("walk", { x: 120, y: 60 }, OLD_CITY_CROSSING).y).toBe(OLD_CITY_CROSSING.requestPoint.y - OLD_CITY_CROSSING.corridorWidth / 2);
+    expect(constrainCrossingPosition("walk", { x: 10, y: 124 }, OLD_CITY_CROSSING).x).toBe(OLD_CITY_CROSSING.requestPoint.x);
   });
 });
 
@@ -72,6 +76,35 @@ describe("ending selection", () => {
 
   it("selects reunion for a direct arrival", () => {
     expect(determineEnding({ elapsedSeconds: 300, detourScore: 2, returnRequested: false })).toBe("reunion");
+  });
+});
+
+describe("wheelchair finale procession", () => {
+  it("starts only when the story wheelchair tip is closed", () => {
+    expect(shouldStartWheelchairProcession({ id: "wheelchair-pushing", source: "wheelchair" })).toBe(true);
+    expect(shouldStartWheelchairProcession({ id: "wheelchair-pushing", source: "sidebar" })).toBe(false);
+    expect(shouldStartWheelchairProcession({ id: "bus-ride-access", source: "bell" })).toBe(false);
+  });
+
+  it("restores the entry and procession at the shared safe start", () => {
+    expect(checkpointForStage("ruins-entry")).toEqual({ scene: "ruins", objectiveId: "meet-lam", resumeStage: "ruins-entry" });
+    expect(checkpointForStage("ruins-procession")).toEqual({ scene: "ruins", objectiveId: "follow-wheelchair", resumeStage: "ruins-procession" });
+    expect(resumePointForStage("ruins-entry")).toEqual(RUINS_PLAYER_START);
+    expect(resumePointForStage("ruins-procession")).toEqual(RUINS_PLAYER_START);
+  });
+
+  it("keeps the three actors 24 pixels apart for the 3.8 second climb", () => {
+    expect(RUINS_PROCESSION_DURATION_MS).toBe(3800);
+    expect(ruinsProcessionPositions(0)).toEqual({ lam: RUINS_LAM_START, daughter: RUINS_DAUGHTER_START, player: RUINS_PLAYER_START });
+    expect(ruinsProcessionPositions(1)).toEqual({ lam: RUINS_LAM_END, daughter: RUINS_DAUGHTER_END, player: RUINS_PLAYER_END });
+    for (const progress of [0, 0.25, 0.5, 0.75, 1]) {
+      const positions = ruinsProcessionPositions(progress);
+      expect(positions.daughter.y - positions.lam.y).toBe(24);
+      expect(positions.player.y - positions.daughter.y).toBe(24);
+      expect(positions.lam.x).toBe(328);
+      expect(positions.daughter.x).toBe(328);
+      expect(positions.player.x).toBe(328);
+    }
   });
 });
 
