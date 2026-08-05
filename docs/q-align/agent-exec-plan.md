@@ -71,7 +71,8 @@
 
 **键位**（现有 + 本次新增）：WASD 行走；Space 精确前敲；按住 Shift 手动摆杖
 （A/D 摆动 ±58°、W/S 缓步）；E 互动（上车/坐下/握扶手/收集记忆/回应/问路）；
-H 复述；Q 方向箭头（4.5s 冷却）；Esc 暂停；**F 手机确认位置（M3 新增）**。
+H 复述；Q 方向箭头（4.5s 冷却）；Esc 暂停。F 手机确认位置于 2026-08-05
+暂时停用并从输入、教程和 HUD 隐藏，辅助算法与测试保留。
 
 **测试**：`npm test` = vitest 跑 src 下 4 个纯逻辑测试文件（flow / content /
 tactile-tiles / oldcity-map）。`npm run test:sites` 跑 Sites Worker 测试。
@@ -342,7 +343,7 @@ image-to-image 以已采用图为风格参考，防止风格漂移。
 设计原则：与"横扫找路、握扶手"并列的正当策略；**不计 detourScore、不改
 `determineEnding`**（flow.ts 结局函数一行不动）。
 
-**① 手机确认位置（键位 F，已确认）**
+**① 手机确认位置（2026-08-05 起暂时停用）**
 - 新纯函数模块 **`src/game/assist.ts`**：
   - `describePhonePosition(sceneId, player, path, objective): string` —— 由场景
     标签（SCENE_LABELS）+ 目标相对方位（八方位）+ 大致距离档合成播报，示例：
@@ -350,10 +351,8 @@ image-to-image 以已采用图为风格参考，防止风格漂移。
   - 方位推导函数 `bearingLabel(from, to): string`（"东北方向"等）独立导出，
     供 npcs.ts 复用。
   - 常量 `PHONE_COOLDOWN_MS = 6000`。
-- scenes.ts：keys 加 `phone: F`（addKeys + addCapture）；`handleActions` 加 F 分支
-  → `announce(describePhonePosition(...))` + speechSynthesis + 冷却。
-- App.tsx：`hud-controls` 操作栏加 `<kbd>F</kbd> 手机定位`；教程页 key-grid 与
-  TUTORIAL_LINES 同步补充。
+- `assist.ts`、`assist.test.ts` 和方位函数继续保留；scenes.ts 不绑定或捕获 F，
+  App.tsx 与 TUTORIAL_LINES 不显示手机定位，未来恢复时再统一接回。
 
 **② 礼貌询问路人（复用 E，已确认）**
 - 新文件 **`src/game/npcs.ts`**：
@@ -425,7 +424,7 @@ image-to-image 以已采用图为风格参考，防止风格漂移。
 人工浏览器：
 - 路口全流程在瓦片层成立：E 请求 → 等待（路缘挡住）→ 双音提示 → 通行（斑马线瓦片
   提亮、走廊约束）→ 对岸 → 切 ruins。黄点线已不存在。
-- F 手机播报在各场景可用、有 6 秒冷却、文案方位正确。
+- F 在各场景不响应且操作界面无提示；`assist.test.ts` 继续验证保留的方位算法。
 - E 问路：靠近 NPC 按 E 得到方向提示；NPC 与扶手/座位同时在附近时距离近者优先。
 - 终章：E 回应林伯 → 全彩波扩散 → 字幕流逐场景点亮 → 结局面板；reducedMotion
   下直接整屏全彩 + 字幕。
@@ -443,16 +442,14 @@ image-to-image 以已采用图为风格参考，防止风格漂移。
 - 闲置小动画（yoyo tween 呼吸/摆动），`reducedMotion` 时静止。
 - 环境小件：晾衣杆、盆栽、水迹反光贴片（程序化或 AI 小件均可，量力而行）。
 
-### 6.2 章节间路线地图（参考图 1 风格）
+### 6.2 章节间像素城市背景（2026-08-05 更新）
 
-- AI 生成一张 640×360 手绘风澳门路线图（關閘 → 17路 → 白鸽巢 → 旧城 → 大三巴
-  五个节点），存 `src/assets/chapter-map.png`，登记 ASSET_SOURCES.md。
+- 内置 ImageGen 生成一张 640×360 暖灰雨夜澳门像素城市背景，存
+  `src/assets/chapter-map-pixel-v2.png`；画面不含路线圆点、连线或文字。
 - **React 层实现**（不进 Phaser）：App.tsx 新增 `ChapterInterstitial` 组件，监听
   现有 `gameEvents.on("scene", ...)`，在章节边界（bus-ride→old-city、
-  old-city-crossing→ruins 等）显示 2.5 秒（任意键可跳过）：地图 + 当前节点高亮
-  （CSS 定位标记）。覆盖层纯展示，场景在其后台正常加载，无阻塞。
-- content.ts 加 `CHAPTER_MAP_NODES: Array<{ scene: SceneId; xPct: number;
-  yPct: number; label: string }>`。
+  old-city-crossing→ruins 等）显示 2.5 秒（任意键可跳过）：像素背景 + 起止场景文字卡。
+  覆盖层纯展示，场景在其后台正常加载，无阻塞。
 
 ### 6.3 收尾盘点与交付检查
 
@@ -486,7 +483,7 @@ image-to-image 以已采用图为风格参考，防止风格漂移。
 | M1收尾 | — | scenes.ts (G1/G2/G4)、oldcity-map.ts (G3)、content.ts (常量/纯函数)、App.tsx (G6)、design-qa.md (G5)、tactile-tiles.test.ts、oldcity-map.test.ts |
 | M2 | tilemap.ts、busstop-map.ts、businterior-map.ts、warm-image.ts、busstop-map.test.ts、businterior-map.test.ts、pixel.test.ts、src/assets/（關閘 AI 素材 5 件） | scenes.ts（钩子泛化、瓦片碰撞、BusStop/BusInterior 重写）、content.ts（PATHS/OBJECTIVES/ROUTE_BRIEFINGS/站牌座位常量）、flow.ts（checkpoint）、types.ts（CaneSurfaceKind/TileMapDefinition）、ground-tiles.ts（concrete/paint/bus-floor/bus-seat）、pixel.ts（toWarmGray）、audio.ts（车门/到站音）、store.ts（存档 v2）、App.tsx（记忆 /3）、oldcity-map.ts（改导出）、各测试、ASSET_SOURCES.md |
 | M3 | crossing-map.ts、ruins-map.ts、assist.ts、npcs.ts、crossing-map.test.ts、ruins-map.test.ts、assist.test.ts、npcs.test.ts、src/assets/（旧城/牌坊 AI 素材） | scenes.ts（Crossing/Ruins 瓦片化、F 键、NPC、终章演出、删黄点线）、content.ts、types.ts（person kind）、ground-tiles.ts（zebra/steps/calcada）、App.tsx（F 提示）、content.test.ts、ASSET_SOURCES.md |
-| M4 | src/assets/chapter-map.png、NPC spritesheets、ChapterInterstitial（App.tsx 内） | npcs.ts、App.tsx、content.ts（CHAPTER_MAP_NODES）、design-qa.md、ASSET_SOURCES.md |
+| M4 | src/assets/chapter-map-pixel-v2.png、src/assets/bus-window-panorama-pixel.png、NPC spritesheets、ChapterInterstitial（App.tsx 内） | npcs.ts、App.tsx、scenes.ts、design-qa.md、ASSET_SOURCES.md |
 
 ## 8. 风险清单与对策
 

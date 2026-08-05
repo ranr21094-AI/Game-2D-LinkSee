@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { audioDirector } from "./game/audio";
-import { CHAPTER_NODES, OBJECTIVES, SCENE_LABELS, TUTORIAL_LINES } from "./game/content";
+import { OBJECTIVES, SCENE_LABELS, TIP_DEFINITIONS, TUTORIAL_LINES } from "./game/content";
 import { destroyGame, pauseGame, resumeGame, startGame } from "./game/engine";
 import { gameEvents } from "./game/events";
 import { finishGame, getSnapshot, loadSnapshot, patchSnapshot, startNewGame } from "./game/store";
-import type { EndingId, GameSettings, GameSnapshotV3, HudState } from "./game/types";
+import type { EndingId, GameSettings, GameSnapshotV3, HudState, TipId } from "./game/types";
 import type { BusTransitState, SceneId } from "./game/types";
-import chapterMapUrl from "./assets/chapter-map.png";
+import chapterMapUrl from "./assets/chapter-map-pixel-v2.png";
 
 const EMPTY_HUD: HudState = {
   objective: "沿四纹盲道前往17路车门",
@@ -47,6 +47,9 @@ export function App() {
   const [confirmReturn, setConfirmReturn] = useState(false);
   const [ending, setEnding] = useState<EndingId | null>(null);
   const [chapter, setChapter] = useState<ChapterTransition | null>(null);
+  const [tipModal, setTipModal] = useState<{ id: TipId; fromIntro: boolean } | null>(null);
+  const [showTipsList, setShowTipsList] = useState(false);
+  const [, setTipsRevision] = useState(0);
   const [saved, setSaved] = useState<GameSnapshotV3 | null>(() => loadSnapshot());
   const [, setSettingsRevision] = useState(0);
   const [showDevTools, setShowDevTools] = useState(import.meta.env.DEV);
@@ -58,11 +61,17 @@ export function App() {
     const offPause = gameEvents.on("pause", (value) => setPaused(value));
     const offEnding = gameEvents.on("ending", (value) => setEnding(value));
     const offChapter = gameEvents.on("chapter", (value) => setChapter(value));
+    const offTipOpen = gameEvents.on("tipOpen", (tip) => {
+      pauseGame();
+      setTipModal(tip);
+      setTipsRevision((revision) => revision + 1);
+    });
     return () => {
       offHud();
       offPause();
       offEnding();
       offChapter();
+      offTipOpen();
       destroyGame();
     };
   }, []);
@@ -88,7 +97,7 @@ export function App() {
   useEffect(() => {
     if (screen !== "playing") return;
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || ending) return;
+      if (event.key !== "Escape" || ending || tipModal) return;
       event.preventDefault();
       if (paused) {
         setConfirmReturn(false);
@@ -101,7 +110,7 @@ export function App() {
     };
     window.addEventListener("keydown", handleEscape, true);
     return () => window.removeEventListener("keydown", handleEscape, true);
-  }, [ending, paused, screen]);
+  }, [ending, paused, screen, tipModal]);
 
   const beginNew = () => {
     audioDirector.unlock();
@@ -133,6 +142,21 @@ export function App() {
     setConfirmReturn(false);
     setPaused(false);
     resumeGame();
+  };
+
+  const dismissTip = () => {
+    if (!tipModal) return;
+    const closing = tipModal;
+    setTipModal(null);
+    gameEvents.emit("tipClosed", closing);
+    resumeGame();
+  };
+
+  const openTip = (id: TipId) => {
+    if (!getSnapshot().unlockedTips.includes(id)) return;
+    setShowTipsList(false);
+    pauseGame();
+    setTipModal({ id, fromIntro: false });
   };
 
   const updateSetting = <K extends keyof GameSettings>(key: K, value: GameSettings[K]) => {
@@ -183,6 +207,11 @@ export function App() {
             <p className="eyebrow">A MACAU SOUND-TOUCH JOURNEY</p>
             <h1 id="game-title">声路·澳门</h1>
             <p className="title-subtitle">用盲杖读懂城市，搭乘17路去赴一场旧约。</p>
+            <div className="mode-select" role="group" aria-label="游戏模式">
+              <button className={getSnapshot().settings.gameMode === "experience" ? "mode-option is-active" : "mode-option"} onClick={() => updateSetting("gameMode", "experience")}>体验模式</button>
+              <button className={getSnapshot().settings.gameMode === "night" ? "mode-option is-active" : "mode-option"} onClick={() => updateSetting("gameMode", "night")}>黑夜模式</button>
+            </div>
+            <p className="mode-note">黑夜模式：城市全黑，点亮只维持片刻，Q 改为目标点闪光指引</p>
             <div className="title-actions">
               <button className="primary-button" onClick={beginNew}>开始新旅程</button>
               {saved && <button className="secondary-button" onClick={continueSaved}>继续：{saved.scene === "bus-stop" ? "關閘" : saved.scene === "old-city" ? "白鸽巢" : "上次检查点"}</button>}
@@ -205,11 +234,11 @@ export function App() {
             <div className="key-grid">
               <span><kbd>WASD / 方向键</kbd> 行走</span><span><kbd>Space</kbd> 一根盲杖敲击</span>
               <span><kbd>Q</kbd> 方向指引</span><span><kbd>H</kbd> 重复任务</span>
-              <span><kbd>F</kbd> 手机定位</span><span><kbd>G</kbd> 照亮四周</span>
+              <span><kbd>G</kbd> 照亮四周</span>
               <span><kbd>E</kbd> 互动</span><span><kbd>Esc</kbd> 暂停</span>
             </div>
             <p className="tutorial-tip">城市以暖灰呈现。杖头触碰处会短暂恢复完整暖色，随后留下淡彩记忆；Q只指出目标方向，不会显示整条路线。</p>
-            <button className="primary-button" onClick={enterGame}>进入17路候车区</button>
+            <button className="primary-button" onClick={enterGame}>从拱北口岸门口出发</button>
           </div>
         </section>
       )}
@@ -226,13 +255,17 @@ export function App() {
               <span>记忆 {String(hud.memories).padStart(2, "0")}</span>
               <span>纠偏 {String(hud.detours).padStart(2, "0")}</span>
             </div>
+            <button className="tips-entry pixel-panel" onClick={() => setShowTipsList(true)} aria-label={`盲人小贴士，已解锁${getSnapshot().unlockedTips.length}条`}>
+              <span className="tips-entry-icon" aria-hidden="true">✦</span>
+              <span><strong>盲人小贴士</strong><small>已解锁 {getSnapshot().unlockedTips.length} 条</small></span>
+            </button>
             <div className="hud-contact pixel-panel" aria-live="polite">
               <span className="hud-label">最近触觉 · 一根盲杖</span>
               <strong>{hud.contact}</strong>
             </div>
             <div className="hud-controls pixel-panel" aria-label="操作提示">
               <span><kbd>空格</kbd> 单杖敲击</span>
-              <span><kbd>Q</kbd> {hud.hintCooling ? "冷却" : "方向"}</span><span><kbd>F</kbd> 手机</span>
+              <span><kbd>Q</kbd> {hud.hintCooling ? "冷却" : "方向"}</span>
               <span><kbd>G</kbd> 照亮</span><span><kbd>E</kbd> 互动</span>
             </div>
             <button className="pause-button" onClick={() => { pauseGame(); setPaused(true); }} aria-label="暂停游戏">Esc 暂停</button>
@@ -260,15 +293,12 @@ export function App() {
               </div>
             )}
             {chapter && (
-              <div className="chapter-interstitial" role="status" aria-live="polite">
+              <div className={`chapter-interstitial${getSnapshot().settings.reducedMotion ? " is-reduced-motion" : ""}`} role="status" aria-live="polite">
                 <img src={chapterMapUrl} alt="澳门章节路线图" />
                 <div className="chapter-map-shade" />
                 <div className="chapter-copy pixel-panel">
-                  <span className="eyebrow">章节路线</span>
+                  <span className="eyebrow">场景切换</span>
                   <strong>{SCENE_LABELS[chapter.from]} → {SCENE_LABELS[chapter.to]}</strong>
-                  <div className="chapter-nodes">
-                    {CHAPTER_NODES.map((node) => <span key={node.scene} className={node.scene === chapter.to ? "is-current" : ""}>{node.label}</span>)}
-                  </div>
                   <small>任意键跳过</small>
                 </div>
               </div>
@@ -301,6 +331,9 @@ export function App() {
             <label className="setting-row setting-toggle">减少动态效果
               <input type="checkbox" checked={getSnapshot().settings.reducedMotion} onChange={(event) => updateSetting("reducedMotion", event.target.checked)} />
             </label>
+            <label className="setting-row setting-toggle">黑夜模式
+              <input type="checkbox" checked={getSnapshot().settings.gameMode === "night"} onChange={(event) => updateSetting("gameMode", event.target.checked ? "night" : "experience")} />
+            </label>
             {!confirmReturn ? (
               <button className="quiet-button" onClick={() => setConfirmReturn(true)}>请求帮助并结束旅程</button>
             ) : (
@@ -312,6 +345,44 @@ export function App() {
             )}
             <button className="quiet-button" onClick={backToMenu}>返回主菜单</button>
           </div>
+        </div>
+      )}
+
+      {showTipsList && !ending && (
+        <div className="modal-backdrop tips-list-backdrop" role="dialog" aria-modal="true" aria-labelledby="tips-list-title">
+          <article className="tips-list-card pixel-panel">
+            <div className="mobility-guide-heading">
+              <p className="eyebrow">旅程收集</p>
+              <h2 id="tips-list-title">盲人小贴士</h2>
+              <p>已经解锁的贴士会留在这里，随时可以重新查看。</p>
+            </div>
+            <div className="tips-list">
+              {getSnapshot().unlockedTips.map((id) => {
+                const tip = TIP_DEFINITIONS[id];
+                return <button key={id} className="tip-list-item" onClick={() => openTip(id)}><strong>{tip.title}</strong><span>{tip.summary}</span></button>;
+              })}
+            </div>
+            {!getSnapshot().unlockedTips.length && <p className="tips-empty">还没有解锁贴士。继续走走看。</p>}
+            <button className="quiet-button" onClick={() => setShowTipsList(false)}>关闭</button>
+          </article>
+        </div>
+      )}
+
+      {tipModal && !ending && (
+        <div className="modal-backdrop mobility-guide-backdrop" role="dialog" aria-modal="true" aria-labelledby="mobility-guide-title">
+          <article className="mobility-guide-card pixel-panel">
+            <div className="mobility-guide-heading">
+              <p className="eyebrow">{TIP_DEFINITIONS[tipModal.id].title}</p>
+              <h2 id="mobility-guide-title">{TIP_DEFINITIONS[tipModal.id].heading}</h2>
+              <p>{TIP_DEFINITIONS[tipModal.id].summary}</p>
+            </div>
+            <img src={TIP_DEFINITIONS[tipModal.id].image} alt={TIP_DEFINITIONS[tipModal.id].imageAlt} />
+            <ol className="mobility-guide-steps">
+              {TIP_DEFINITIONS[tipModal.id].steps.map((step) => <li key={step.title}><strong>{step.title}</strong><span>{step.body}</span></li>)}
+            </ol>
+            <p className="mobility-guide-callout">{TIP_DEFINITIONS[tipModal.id].callout}</p>
+            <button className="primary-button" onClick={dismissTip}>{tipModal.fromIntro ? "我知道了，前往盲道起点" : "关闭贴士"}</button>
+          </article>
         </div>
       )}
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { composeRepeatText, OLD_CITY_CROSSING, OLD_CITY_HANDRAIL, PATHS, REVEAL_PROFILE, TACTILE_LIT_MS } from "./content";
+import { composeRepeatText, OLD_CITY_CROSSING, OLD_CITY_HANDRAIL, PATHS, REVEAL_PROFILE, TACTILE_LIT_MS, TIP_DEFINITIONS, TUTORIAL_LINES } from "./content";
 import { BUS_INTERIOR_TILEMAP } from "./businterior-map";
 import { BUS_STOP_TILEMAP } from "./busstop-map";
 import { CROSSING_TILEMAP } from "./crossing-map";
@@ -46,6 +46,7 @@ describe("tactile path definitions", () => {
 
   it("places decision tiles at boarding, seat and destination tasks", () => {
     const decisions = Object.values(PATHS).flatMap((path) => path.nodes.filter((node) => node.kind === "decision"));
+    expect(decisions.find((node) => node.taskId === "find-stop-sign")).toMatchObject({ x: 488, y: 252 });
     expect(decisions.some((node) => node.taskId === "board-17")).toBe(true);
     expect(decisions.some((node) => node.taskId === "find-seat")).toBe(true);
     expect(decisions.some((node) => node.taskId === "meet-lam")).toBe(true);
@@ -70,7 +71,7 @@ describe("tactile path definitions", () => {
     expect(REVEAL_PROFILE.tapBackTiles).toBe(0);
     expect(REVEAL_PROFILE.tapDurationMs).toBe(180);
     expect(REVEAL_PROFILE.hintTiles).toBe(8);
-    expect(REVEAL_PROFILE.hintDurationMs).toBe(3500);
+    expect(REVEAL_PROFILE.hintDurationMs).toBe(2000);
   });
 
   it("keeps tactile highlight and color memory timing aligned", () => {
@@ -79,5 +80,18 @@ describe("tactile path definitions", () => {
 
   it("repeats the latest tactile result together with the current task", () => {
     expect(composeRepeatText("四条连续凸纹：沿纹路继续", "当前任务：找到扶手")).toBe("最近触觉：四条连续凸纹：沿纹路继续。当前任务：找到扶手");
+  });
+
+  it("keeps the temporarily disabled F phone assist out of tutorial copy", () => {
+    expect(TUTORIAL_LINES.join(" ")).not.toMatch(/F\s*辅助|F\s*手机|手机定位/);
+  });
+
+  it("defines both data-driven accessibility tips", () => {
+    expect(Object.keys(TIP_DEFINITIONS)).toEqual(["sighted-guide", "bus-access"]);
+    const tip = TIP_DEFINITIONS["bus-access"];
+    expect(tip.title).toBe("帮助盲人乘车");
+    expect(tip.steps).toHaveLength(3);
+    expect(tip.callout).toContain("先问");
+    expect(tip.image).toContain("bus-accessibility-tip-pixel");
   });
 });

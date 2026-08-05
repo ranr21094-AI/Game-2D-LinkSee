@@ -17,7 +17,9 @@ export type DecorationKind =
   | "stone-gate"
   | "ruins-facade"
   | "bus-window"
-  | "bus-pole";
+  | "bus-pole"
+  | "stop-sign-17"
+  | "stop-sign-25";
 
 export type MapDecoration = {
   kind: DecorationKind;
@@ -27,6 +29,12 @@ export type MapDecoration = {
   height: number;
   depth?: number;
   flipX?: boolean;
+  /** Solid decorations block movement; the player cannot step onto their footprint. */
+  solid?: boolean;
+  /** Blocked strip width measured from the sprite center; defaults to width. */
+  solidWidth?: number;
+  /** Blocked strip height measured up from the sprite base; defaults to height. */
+  solidHeight?: number;
 };
 
 export type TileMapDefinition = {
@@ -70,7 +78,20 @@ export function movementUnderPoint(map: TileMapDefinition, point: { x: number; y
   return movementAt(map, Math.floor(point.x / 16), Math.floor((point.y - map.offsetY) / 16));
 }
 
+export function solidDecorationAt(map: TileMapDefinition, point: { x: number; y: number }): MapDecoration | null {
+  return map.decorations.find((decoration) => {
+    if (!decoration.solid) return false;
+    const halfWidth = (decoration.solidWidth ?? decoration.width) / 2;
+    const solidHeight = decoration.solidHeight ?? decoration.height;
+    return point.x >= decoration.x - halfWidth
+      && point.x <= decoration.x + halfWidth
+      && point.y > decoration.y - solidHeight
+      && point.y <= decoration.y;
+  }) ?? null;
+}
+
 export function isWalkable(map: TileMapDefinition, point: { x: number; y: number }): boolean {
+  if (solidDecorationAt(map, point)) return false;
   const movement = movementUnderPoint(map, point);
   return movement === "walkable" || movement === "road" || movement === "crossing";
 }
@@ -81,6 +102,7 @@ export function nearestSafeWalkablePoint(map: TileMapDefinition, point: { x: num
     for (let colIndex = 0; colIndex < map.movementRows[rowIndex].length; colIndex += 1) {
       if (movementAt(map, colIndex, rowIndex) !== "walkable") continue;
       const center = tileCenter(colIndex, rowIndex, map.offsetY);
+      if (solidDecorationAt(map, center)) continue;
       const distance = Math.hypot(center.x - point.x, center.y - point.y);
       if (!best || distance < best.distance) best = { ...center, distance };
     }

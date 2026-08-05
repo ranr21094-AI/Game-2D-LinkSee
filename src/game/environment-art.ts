@@ -29,7 +29,7 @@ const ARCHITECTURE_CROPS: Partial<Record<DecorationKind, Crop>> = {
   "stone-gate": { x: 495, y: 280, width: 305, height: 180 },
 };
 
-const PROGRAMMATIC_KINDS = ["gate-building", "shelter", "bus", "bench", "lamp", "signal", "bus-window", "bus-pole"] as const;
+const PROGRAMMATIC_KINDS = ["shelter", "bus", "bench", "lamp", "signal", "bus-window", "bus-pole", "stop-sign-17", "stop-sign-25"] as const;
 type ProgrammaticKind = (typeof PROGRAMMATIC_KINDS)[number];
 
 type Palette = { stone: string; dark: string; light: string; metal: string; glow: string; red: string };
@@ -47,21 +47,63 @@ function rect(ctx: CanvasRenderingContext2D, color: string, x: number, y: number
 function drawProgrammatic(ctx: CanvasRenderingContext2D, kind: DecorationKind, width: number, height: number, state: GroundVisualState): void {
   const p = PALETTES[state];
   ctx.clearRect(0, 0, width, height);
-  if (kind === "gate-building") {
-    rect(ctx, p.dark, 0, 12, width, height - 12); rect(ctx, p.stone, 4, 16, width - 8, height - 20); rect(ctx, p.light, 0, 10, width, 6);
-    for (let x = 16; x < width - 16; x += 42) { rect(ctx, p.dark, x, 34, 24, 34); rect(ctx, p.glow, x + 4, 38, 16, 11); rect(ctx, p.dark, x + 11, 38, 2, 26); }
-    rect(ctx, p.dark, width / 2 - 28, 48, 56, 44); rect(ctx, p.metal, width / 2 - 23, 54, 46, 38);
-  } else if (kind === "shelter") {
-    rect(ctx, p.dark, 0, 7, width, 9); rect(ctx, p.light, 4, 3, width - 8, 5);
-    [12, width / 2, width - 12].forEach((x) => { rect(ctx, p.metal, x - 3, 14, 6, height - 14); rect(ctx, p.light, x - 2, 15, 2, height - 16); });
-    rect(ctx, p.dark, 24, 56, width - 48, 5);
+  if (kind === "shelter") {
+    // roof slab with front lip and drip edge
+    rect(ctx, p.dark, 0, 6, width, 10);
+    rect(ctx, p.light, 3, 2, width - 6, 5);
+    rect(ctx, p.metal, 0, 15, width, 2);
+    // translucent glass back panel with metal frame
+    rect(ctx, p.metal, 14, 30, width - 28, 34);
+    rect(ctx, p.glow, 17, 33, width - 34, 28);
+    // welcome board mounted on the back panel, text centered
+    rect(ctx, p.dark, width / 2 - 44, 34, 88, 26);
+    rect(ctx, p.light, width / 2 - 41, 37, 82, 20);
+    ctx.fillStyle = p.dark;
+    ctx.font = `700 12px "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("澳门欢迎您", width / 2, 48);
+    // end posts with base plates (no middle post)
+    [12, width - 12].forEach((x) => {
+      rect(ctx, p.metal, x - 3, 16, 6, height - 22);
+      rect(ctx, p.light, x - 2, 17, 2, height - 24);
+      rect(ctx, p.dark, x - 6, height - 6, 12, 5);
+    });
   } else if (kind === "bus") {
     rect(ctx, p.dark, 2, 8, width - 4, height - 12); rect(ctx, p.stone, 5, 12, width - 10, height - 22); rect(ctx, p.red, 5, height - 24, width - 10, 5);
     for (let x = 14; x < width - 54; x += 35) { rect(ctx, p.dark, x, 18, 28, 19); rect(ctx, p.glow, x + 3, 21, 22, 9); }
     rect(ctx, p.dark, width - 49, 14, 40, height - 22); rect(ctx, p.metal, width - 45, 18, 16, height - 30); rect(ctx, p.metal, width - 27, 18, 14, height - 30);
     [34, width - 38].forEach((x) => { ctx.fillStyle = p.dark; ctx.beginPath(); ctx.arc(x, height - 8, 9, 0, Math.PI * 2); ctx.fill(); });
   } else if (kind === "bench") {
-    rect(ctx, p.light, 2, 3, width - 4, 6); rect(ctx, p.stone, 2, 12, width - 4, 8); rect(ctx, p.dark, 8, 20, 6, 8); rect(ctx, p.dark, width - 14, 20, 6, 8);
+    // backrest slats and side posts
+    rect(ctx, p.dark, 3, 0, 3, 22);
+    rect(ctx, p.dark, width - 6, 0, 3, 22);
+    rect(ctx, p.dark, 4, 1, width - 8, 3);
+    rect(ctx, p.light, 4, 5, width - 8, 3);
+    // seat slats with gaps
+    rect(ctx, p.stone, 2, 11, width - 4, 3);
+    rect(ctx, p.light, 2, 15, width - 4, 3);
+    rect(ctx, p.stone, 2, 19, width - 4, 3);
+    // legs
+    rect(ctx, p.dark, 6, 22, 5, 6);
+    rect(ctx, p.dark, width - 11, 22, 5, 6);
+  } else if (kind === "stop-sign-17" || kind === "stop-sign-25") {
+    const route = kind === "stop-sign-17" ? "17" : "25";
+    // framed plate with a route color band
+    rect(ctx, p.dark, 0, 0, width, 42);
+    rect(ctx, p.metal, 2, 2, width - 4, 38);
+    rect(ctx, p.light, 4, 4, width - 8, 34);
+    rect(ctx, p.red, 4, 4, width - 8, 6);
+    // pole with collar and base flange
+    rect(ctx, p.dark, width / 2 - 3, 42, 6, 5);
+    rect(ctx, p.metal, width / 2 - 2, 47, 4, height - 51);
+    rect(ctx, p.dark, width / 2 - 6, height - 4, 12, 4);
+    // raised route number
+    ctx.fillStyle = "#242321";
+    ctx.font = `bold ${Math.max(13, Math.round(width * 0.58))}px monospace`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(route, width / 2, 25);
   } else if (kind === "lamp" || kind === "signal") {
     rect(ctx, p.dark, width / 2 - 3, kind === "lamp" ? 20 : 17, 6, height - (kind === "lamp" ? 20 : 17));
     rect(ctx, p.metal, width / 2 - 2, kind === "lamp" ? 21 : 18, 2, height - 24);
@@ -111,6 +153,69 @@ function ensureProgrammaticTextures(scene: Phaser.Scene, kind: ProgrammaticKind,
   return textures;
 }
 
+type GateTileKind = "parapet" | "window" | "wall" | "canopy" | "pillar" | "entrance";
+
+function drawGateTile(ctx: CanvasRenderingContext2D, kind: GateTileKind, state: GroundVisualState): void {
+  const p = PALETTES[state];
+  ctx.clearRect(0, 0, 16, 16);
+  rect(ctx, p.stone, 0, 0, 16, 16);
+  if (kind === "parapet") {
+    rect(ctx, p.light, 0, 0, 16, 3); rect(ctx, p.dark, 0, 12, 16, 4); rect(ctx, p.metal, 2, 5, 12, 2);
+  } else if (kind === "window") {
+    rect(ctx, p.dark, 2, 1, 12, 14); rect(ctx, p.glow, 4, 3, 8, 5); rect(ctx, p.metal, 7, 2, 2, 13); rect(ctx, p.metal, 3, 9, 10, 2);
+  } else if (kind === "wall") {
+    rect(ctx, p.light, 1, 1, 14, 3); rect(ctx, p.dark, 0, 8, 16, 1); rect(ctx, p.metal, 7, 0, 1, 16);
+  } else if (kind === "canopy") {
+    rect(ctx, p.dark, 0, 2, 16, 7); rect(ctx, p.light, 0, 1, 16, 2); rect(ctx, p.metal, 0, 9, 16, 3); rect(ctx, p.dark, 0, 14, 16, 2);
+  } else if (kind === "pillar") {
+    rect(ctx, p.dark, 3, 0, 10, 16); rect(ctx, p.light, 5, 0, 3, 16); rect(ctx, p.metal, 2, 13, 12, 3);
+  } else {
+    rect(ctx, p.dark, 0, 0, 16, 16); rect(ctx, p.metal, 2, 1, 12, 15); rect(ctx, p.glow, 4, 3, 8, 5); rect(ctx, p.dark, 7, 1, 2, 15);
+  }
+}
+
+function gateTileKind(row: number, col: number, columns: number): GateTileKind {
+  const center = Math.floor(columns / 2);
+  if (row === 0) return "parapet";
+  if (row === 1 || row === 2) return Math.abs(col - center) <= 3 ? "wall" : "window";
+  if (row === 3) return "canopy";
+  if (Math.abs(col - center) <= 2) return "entrance";
+  return col % 4 === 0 ? "pillar" : "wall";
+}
+
+function ensureGateTileTextures(scene: Phaser.Scene, kind: GateTileKind): Record<GroundVisualState, string> {
+  const keys = {} as Record<GroundVisualState, string>;
+  STATES.forEach((state) => {
+    const key = `gate-tile-${kind}-${state}`;
+    keys[state] = key;
+    if (scene.textures.exists(key)) return;
+    const texture = scene.textures.createCanvas(key, 16, 16);
+    if (!texture) return;
+    drawGateTile(texture.getContext(), kind, state);
+    texture.refresh();
+  });
+  return keys;
+}
+
+function ensureGateSignTextures(scene: Phaser.Scene): Record<GroundVisualState, string> {
+  const keys = {} as Record<GroundVisualState, string>;
+  STATES.forEach((state) => {
+    const key = `gate-sign-${state}`;
+    keys[state] = key;
+    if (scene.textures.exists(key)) return;
+    const texture = scene.textures.createCanvas(key, 112, 26);
+    if (!texture) return;
+    const ctx = texture.getContext();
+    const p = PALETTES[state];
+    rect(ctx, p.dark, 0, 0, 112, 26); rect(ctx, p.glow, 2, 2, 108, 22); rect(ctx, p.dark, 4, 4, 104, 18);
+    ctx.font = '700 14px "Noto Serif CJK SC", "SimSun", serif';
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = p.glow;
+    ctx.fillText("拱北口岸", 56, 13);
+    texture.refresh();
+  });
+  return keys;
+}
+
 export type EnvironmentSprite = {
   sprite: Phaser.GameObjects.Image;
   textures: Record<GroundVisualState, string>;
@@ -132,7 +237,27 @@ function ensureArchitectureFrames(scene: Phaser.Scene, kind: DecorationKind): Re
   return frames;
 }
 
-export function renderMapDecoration(scene: Phaser.Scene, decoration: MapDecoration): EnvironmentSprite | null {
+export function renderMapDecoration(scene: Phaser.Scene, decoration: MapDecoration): EnvironmentSprite | EnvironmentSprite[] | null {
+  if (decoration.kind === "gate-building") {
+    const columns = Math.max(1, Math.round(decoration.width / 16));
+    const rows = Math.max(1, Math.round(decoration.height / 16));
+    const left = decoration.x - columns * 8;
+    const top = decoration.y - rows * 16;
+    const tiles: EnvironmentSprite[] = [];
+    for (let row = 0; row < rows; row += 1) for (let col = 0; col < columns; col += 1) {
+      const kind = gateTileKind(row, col, columns);
+      const textures = ensureGateTileTextures(scene, kind);
+      const x = left + col * 16 + 8;
+      const y = top + row * 16 + 8;
+      const sprite = scene.add.image(x, y, textures.base).setDepth(decoration.depth ?? 3);
+      tiles.push({ sprite, textures, x, y });
+    }
+    const signTextures = ensureGateSignTextures(scene);
+    const signY = top + 42;
+    const sign = scene.add.image(decoration.x, signY, signTextures.base).setDepth((decoration.depth ?? 3) + 0.2);
+    tiles.push({ sprite: sign, textures: signTextures, x: decoration.x, y: signY });
+    return tiles;
+  }
   if (decoration.kind === "tree") {
     const sprite = scene.add.image(decoration.x, decoration.y, TREE_TEXTURE.base).setOrigin(0.5, 1).setDisplaySize(decoration.width, decoration.height).setDepth(decoration.y);
     if (decoration.flipX) sprite.setFlipX(true);

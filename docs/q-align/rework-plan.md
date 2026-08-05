@@ -63,8 +63,8 @@
 
 ### 里程碑 4：打磨与交付
 
-- 生活化 NPC（参考图 2/3）、章节间澳门路线地图（参考图 1 风格）。
-- `npm run build` + `npm run test:sites`，确认 `dist/client/index.html`、`dist/server/index.js`、`dist/.openai/hosting.json` 后再谈公开部署。
+- 生活化 NPC（参考图 2/3）、章节间澳门像素城市背景；2026-08-05 起不再显示路线圆点或连线，只保留场景起止文字卡。
+- `npm run build` + `npm run test:sites`，确认 `dist/client/index.html`、`dist/server/index.js`、`dist/.openai/hosting.json` 后再谈公开部署。（2026-08-05 已跑通：build:sites 构建成功，test:sites 4/4 通过，三件产物齐全；环境无 npm，用 `node node_modules/...` 等价命令执行。）
 
 ## 素材策略（已确认 2026-08-04）
 

@@ -45,16 +45,21 @@ export const BUS_STOP_TILEMAP: TileMapDefinition = {
     fill("."), fill("r"), fill("r"), fill("r"),
   ],
   decorations: [
-    { kind: "gate-building", x: 320, y: 100, width: 620, height: 96, depth: 3 },
-    { kind: "shelter", x: 288, y: 190, width: 260, height: 86, depth: 8 },
-    { kind: "bench", x: 112, y: 224, width: 72, height: 28, depth: 9 },
-    { kind: "bench", x: 360, y: 224, width: 72, height: 28, depth: 9 },
+    { kind: "gate-building", x: 320, y: 100, width: 640, height: 96, depth: 3, solid: true },
+    { kind: "shelter", x: 352, y: 190, width: 260, height: 86, depth: 8 },
+    { kind: "bench", x: 112, y: 224, width: 72, height: 28, depth: 9, solid: true },
+    { kind: "bench", x: 424, y: 168, width: 72, height: 28, depth: 9, solid: true },
+    { kind: "stop-sign-17", x: 520, y: 282, width: 26, height: 62, solid: true, solidWidth: 12, solidHeight: 24 },
+    { kind: "stop-sign-25", x: 272, y: 282, width: 26, height: 62, solid: true, solidWidth: 12, solidHeight: 24 },
     { kind: "lamp", x: 48, y: 252, width: 22, height: 86, depth: 12 },
     { kind: "lamp", x: 592, y: 252, width: 22, height: 86, depth: 12 },
     { kind: "bus", x: 520, y: 356, width: 208, height: 72, depth: 7 },
   ],
 };
 
-export const BUS_STOP_SIGN = { x: 232, y: 204 } as const;
-export const BUS_STOP_DECOY_SIGNS = [{ x: 392, y: 204, route: "25" }] as const;
+export const BUS_STOP_SIGN = { x: 520, y: 241 } as const;
+export const BUS_STOP_DECOY_SIGNS = [{ x: 272, y: 241, route: "25" }] as const;
+export const BUS_STOP_SIGN_PROBE_RADIUS = 42;
 export const BUS_STOP_DOOR = { x: 488, y: 284 } as const;
+export const BUS_STOP_GATE_ENTRY = { x: 320, y: 124 } as const;
+export const BUS_STOP_PATH_START = { x: 88, y: 268 } as const;

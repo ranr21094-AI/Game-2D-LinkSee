@@ -1,24 +1,55 @@
-import type { CrossingDefinition, GuideRailDefinition, ObjectiveStep2D, RevealProfile, SceneId, TactilePathDefinition } from "./types";
+import busAccessibilityTipUrl from "../assets/bus-accessibility-tip-pixel.png";
+import sightedGuideTutorialUrl from "../assets/sighted-guide-tutorial-pixel.png";
+import type { CrossingDefinition, GuideRailDefinition, ObjectiveStep2D, RevealProfile, SceneId, TactilePathDefinition, TipDefinition, TipId } from "./types";
 
 export const REVEAL_PROFILE: RevealProfile = {
   tapForwardTiles: 1,
   tapBackTiles: 0,
   tapDurationMs: 180,
   hintTiles: 8,
-  hintDurationMs: 3500,
+  hintDurationMs: 2000,
   hintCooldownMs: 4500,
   color: 0xf6ca55,
 };
 
 export const TACTILE_LIT_MS = 2000;
 
+export const TIP_DEFINITIONS: Record<TipId, TipDefinition> = {
+  "sighted-guide": {
+    id: "sighted-guide",
+    title: "扶盲方法",
+    heading: "让盲人握住你的手臂",
+    summary: "先征求同意，再让盲人主动握住你的肘部，并把你看到的路况说清楚。",
+    image: sightedGuideTutorialUrl,
+    imageAlt: "暖灰像素插图：工作人员先征求同意，盲人主动握住引导者肘部，随后在引导者侧后方半步随行",
+    steps: [
+      { title: "先询问", body: "从正面接近，说清身份和要提供的帮助，得到同意后再接触。" },
+      { title: "递手臂", body: "轻触手背或把手臂靠近，让盲人主动握住你的肘部；引导者领先半步。" },
+      { title: "说清路况", body: "把你看到的告诉盲人：方向、台阶、路缘、窄处、障碍物和即将发生的转向。" },
+    ],
+    callout: "关键：把你看到的告诉盲人，不替对方做决定。",
+  },
+  "bus-access": {
+    id: "bus-access",
+    title: "帮助盲人乘车",
+    heading: "看见盲人等车，可以这样帮忙",
+    summary: "盲人可能无法确认驶来的线路、车辆是否进站和车门位置，一次主动询问，可能帮他赶上想坐的车。",
+    image: busAccessibilityTipUrl,
+    imageAlt: "暖灰雨夜像素插图：持盲杖的乘客在公交站等待，一名公众主动靠近询问，公交车停在旁边",
+    steps: [
+      { title: "主动询问", body: "先自我介绍，询问是否需要确认线路或协助，不要突然拉住或推着走。" },
+      { title: "说清车辆", body: "说明线路、车辆进站方向和车门位置；不确定时先向司机或工作人员确认。" },
+      { title: "征得同意再协助", body: "得到同意后陪到车门或递出手臂，并说明台阶、路缘和周围人流。" },
+    ],
+    callout: "先问、说清楚、再陪同，不替对方做决定。",
+  },
+};
+
 export const ROUTE_BRIEFINGS: Record<"bus-stop" | "bus-interior", string> = {
-  "bus-stop": "站牌信息：17路开往白鸽巢，站台右侧还有一块写着25的相似站牌，请用盲杖确认17这个凸字。",
+  "bus-stop": "站牌信息：17路开往白鸽巢，沿途还有一块写着25的相似站牌，请用盲杖确认17这个凸字。",
   "bus-interior": "车厢信息：车门在身后，中央扶手向前延伸；左侧座位边缘有软垫和金属框，确认后按 E 坐下。",
 };
 
-export const BUS_STOP_SIGN = { x: 232, y: 204 } as const;
-export const BUS_STOP_DECOY_SIGNS = [{ x: 392, y: 204, route: "25" }] as const;
 export const BUS_SEAT_EDGE = { x: 344, y: 172 } as const;
 
 export const SCENE_LABELS: Record<SceneId, string> = {
@@ -30,20 +61,12 @@ export const SCENE_LABELS: Record<SceneId, string> = {
   ruins: "大三巴牌坊",
 };
 
-export const CHAPTER_NODES = [
-  { scene: "bus-stop" as const, label: "關閘" },
-  { scene: "bus-interior" as const, label: "17路" },
-  { scene: "old-city" as const, label: "白鸽巢" },
-  { scene: "old-city-crossing" as const, label: "旧城" },
-  { scene: "ruins" as const, label: "大三巴" },
-];
-
 export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
   "find-stop-sign": {
     id: "find-stop-sign",
     scene: "bus-stop",
     label: "触碰站牌，确认17路方向",
-    target: BUS_STOP_SIGN,
+    target: { x: 488, y: 252 },
     triggerRadius: 34,
     interaction: "approach",
     checkpoint: true,
@@ -141,8 +164,9 @@ export const PATHS: Record<Exclude<SceneId, "bus-ride">, TactilePathDefinition> 
     nodes: [
       { x: 88, y: 268, kind: "guidance" },
       { x: 232, y: 268, kind: "decision" },
-      { x: 232, y: 204, kind: "decision", taskId: "find-stop-sign" },
+      { x: 232, y: 204, kind: "decision" },
       { x: 488, y: 204, kind: "guidance" },
+      { x: 488, y: 252, kind: "decision", taskId: "find-stop-sign" },
       { x: 488, y: 284, kind: "decision", taskId: "board-17" },
     ],
   },
@@ -206,7 +230,7 @@ export const OLD_CITY_CROSSING: CrossingDefinition = {
 export const TUTORIAL_LINES = [
   "四条凸纹表示继续前进",
   "4×4凸点表示停下探测并改变方向",
-  "Space 敲击单杖 · G照亮四周 · E互动 · Q方向提示 · H重复任务 · F辅助",
+  "Space 敲击单杖 · G照亮四周 · E互动 · Q方向提示 · H重复任务",
 ];
 
 export function composeRepeatText(contact: string, task: string): string {

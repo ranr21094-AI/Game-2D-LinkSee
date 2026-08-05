@@ -18,9 +18,17 @@
 | `src/assets/ruins-facade-{base,memory,warm}.png` | 大三巴牌坊终章模块三态（165×200） | 内置生图以建筑图集为风格参考生成透明底竖版原图；`scripts/process_ruins_facade.py` 取最大连通域去水印，base 按 0.24/0.68/0.08 亮度灰度化，memory 保留 34% 色彩（与地砖 TONES 一致） |
 | `docs/q-align/ruins-facade-source.png` | 牌坊生成记录与复核源图 | 五层立面、三角山花在位、中央拱窗暖光；程序化矩形版 `ruins-facade` 已退役 |
 | `src/assets/npc-spritesheet.png` | 两名问路 NPC | ImageGen 角色表，透明化后使用 |
-| `src/assets/chapter-map.png` | 章节过场路线图 | ImageGen 原图；当前节点和中文说明由 React 叠加 |
+| `src/assets/chapter-map-pixel-v2.png` | 章节过场像素城市背景（640×360） | 内置 ImageGen 以旧章节图为构图参考、以当前游戏截图为风格参考生成；二次编辑彻底移除五个圆点与连接线，再以 nearest-neighbor 降采样并量化为 96 色；画面不含路线、文字、人物或 HUD |
+| `docs/q-align/chapter-map-pixel-source.png` | 新章节背景生成记录与复核源图 | 16:9 暖灰雨夜澳门城市；關閘、候车站、骑楼街区和大三巴仅作环境叙事，场景名称由 React 文字卡叠加 |
+| `src/assets/bus-window-panorama-pixel.png` | 巴士过场车窗外街景条（1024×96） | 内置 ImageGen 生成雨夜澳门骑楼横向街景；取原图中段、nearest-neighbor 缩放并量化为 96 色，只在车窗模块中整数像素滚动 |
+| `docs/q-align/bus-window-panorama-source.png` | 车窗街景生成记录与复核源图 | 无人物、车辆、标牌、路线、可读文字和 HUD；生产只裁取窄幅街景，不作为全屏背景 |
+| `src/assets/traveler-sit.png` | 候车长椅坐姿玩家精灵 | 基于玩家正面像素角色生成并裁切为 64×64；运行时脚底锚定长椅中心，人物整体绘制在长椅前层 |
+| `src/assets/sighted-guide-tutorial-pixel.png` | 口岸序章的扶盲教学三格插图（960×520） | 内置 ImageGen 参考用户提供的动作说明图，仅保留正确动作关系并改为暖灰雨夜像素风；裁去外边距、nearest-neighbor 缩放并量化为 128 色；所有中文说明由 React 叠加 |
+| `docs/q-align/sighted-guide-tutorial-source.png` | 扶盲教学图生成记录与复核源图 | 三格分别表现征求同意、盲人主动握肘、引导者领先半步并描述路缘；无图片内文字、箭头、HUD、品牌或水印 |
+| `src/assets/bus-accessibility-tip-pixel.png` | 上车前“帮助盲人乘车”公益贴士插图 | 内置 ImageGen 生成暖灰雨夜像素公交站场景；盲人持杖等车、公众主动询问、公交进站；无品牌、可读文字、水印或用户照片人物元素 |
+| `docs/q-align/gate-facade-source.png` | 已退役的关闸立面参考源图 | 仅保留为历史美术参考；生产代码不再导入或裁切该图。关闸现由 parapet/window/wall/canopy/pillar/entrance 六类 16px 程序化瓦片和代码文字牌组成，并进入统一 base/memory/warm 三态 |
 
-本轮建筑提示约束为：雨夜暖灰澳门葡中建筑、16-bit 像素模块、3×2 独立排布、统一比例；禁止人物、车辆、HUD、路线、品牌、标牌、可读文字和整张场景背景。最终游戏只裁取独立模块，建筑不参与盲道逻辑。
+本轮建筑与过场提示约束为：雨夜暖灰澳门葡中建筑、16-bit 像素模块、统一比例；禁止 HUD、路线、品牌和非代码可读文字。章节图不含预绘制圆点或连线，车窗图只作为窄幅模块，关闸建筑完全瓦片化且不参与盲道逻辑。扶盲教学图允许人物，但正确动作和中文说明分别由插图与代码承担。
 
 ## CC0 环境音
 

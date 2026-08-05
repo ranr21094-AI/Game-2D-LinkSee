@@ -1,4 +1,4 @@
-import type { EndingId, GameSnapshotV2, GameSnapshotV3, MemoryId, ResumeStage } from "./types";
+import type { EndingId, GameSnapshotV2, GameSnapshotV3, MemoryId, ResumeStage, TipId } from "./types";
 import { checkpointForStage } from "./flow";
 
 export const SAVE_KEY = "sound-road-macau-2d:v3";
@@ -11,11 +11,14 @@ const DEFAULT_SETTINGS: GameSnapshotV3["settings"] = {
   dialogueVolume: 0.9,
   subtitleScale: 1,
   reducedMotion: false,
+  gameMode: "experience",
 };
 
 export function createInitialSnapshot(): GameSnapshotV3 {
   return {
     version: 3,
+    mobilityGuideSeen: false,
+    unlockedTips: [],
     objectiveId: "find-stop-sign",
     scene: "bus-stop",
     resumeStage: "bus-stop-entry",
@@ -57,6 +60,8 @@ function migrateV2(legacy: GameSnapshotV2): GameSnapshotV3 {
   };
   return {
     ...createInitialSnapshot(),
+    mobilityGuideSeen: false,
+    unlockedTips: [],
     objectiveId: legacy.objectiveId,
     scene: legacy.scene,
     resumeStage: stageByScene[legacy.scene],
@@ -83,6 +88,8 @@ export function loadSnapshot(): GameSnapshotV3 | null {
         ...createInitialSnapshot(),
         ...parsed,
         version: 3,
+        mobilityGuideSeen: Boolean(parsed.mobilityGuideSeen),
+        unlockedTips: Array.isArray(parsed.unlockedTips) ? parsed.unlockedTips.filter((id): id is TipId => id === "sighted-guide" || id === "bus-access") : [],
         activeElapsedMs: Number.isFinite(parsed.activeElapsedMs) ? Math.max(0, parsed.activeElapsedMs ?? 0) : 0,
         colorMemory: Array.isArray(parsed.colorMemory) ? parsed.colorMemory : [],
         memories: Array.isArray(parsed.memories) ? parsed.memories : [],
@@ -135,7 +142,7 @@ export function patchSnapshot(patch: Partial<GameSnapshotV3>): GameSnapshotV3 {
 
 export function startNewGame(): GameSnapshotV3 {
   activeStartedAt = null;
-  snapshot = createInitialSnapshot();
+  snapshot = { ...createInitialSnapshot(), settings: { ...snapshot.settings } };
   return persist();
 }
 
@@ -146,6 +153,11 @@ export function setCheckpoint(stage: ResumeStage): GameSnapshotV3 {
 export function collectMemory(id: MemoryId): GameSnapshotV3 {
   if (snapshot.memories.includes(id)) return snapshot;
   return patchSnapshot({ memories: [...snapshot.memories, id] });
+}
+
+export function unlockTip(id: TipId): GameSnapshotV3 {
+  if (snapshot.unlockedTips.includes(id)) return snapshot;
+  return patchSnapshot({ unlockedTips: [...snapshot.unlockedTips, id] });
 }
 
 export function finishGame(ending: EndingId): GameSnapshotV3 {

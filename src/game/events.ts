@@ -1,4 +1,4 @@
-import type { EndingId, HudState, SceneId, TilePoint } from "./types";
+import type { EndingId, HudState, SceneId, TipId, TilePoint } from "./types";
 
 type EventMap = {
   hud: HudState;
@@ -10,6 +10,8 @@ type EventMap = {
   devInteract: undefined;
   devReveal: "hint";
   chapter: { from: SceneId; to: SceneId };
+  tipOpen: { id: TipId; fromIntro: boolean };
+  tipClosed: { id: TipId; fromIntro: boolean };
 };
 
 type Handler<T> = (payload: T) => void;

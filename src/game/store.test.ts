@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { LEGACY_SAVE_KEY, SAVE_KEY, getActiveElapsedMs, getSnapshot, loadSnapshot, pauseActiveTimer, resumeActiveTimer, setCheckpoint, startNewGame } from "./store";
+import { LEGACY_SAVE_KEY, SAVE_KEY, getActiveElapsedMs, getSnapshot, loadSnapshot, patchSnapshot, pauseActiveTimer, resumeActiveTimer, setCheckpoint, startNewGame, unlockTip } from "./store";
 import type { GameSnapshotV2 } from "./types";
 
 class MemoryStorage implements Storage {
@@ -33,6 +33,33 @@ describe("V3 game snapshot", () => {
     expect(getSnapshot()).toMatchObject({ scene: "bus-stop", objectiveId: "board-17", resumeStage: "bus-stop-sign" });
   });
 
+  it("keeps the chosen game mode and volume settings across a new game", () => {
+    patchSnapshot({ settings: { ...getSnapshot().settings, gameMode: "night" }, mobilityGuideSeen: true });
+    startNewGame();
+    expect(getSnapshot().settings.gameMode).toBe("night");
+    expect(getSnapshot()).toMatchObject({ scene: "bus-stop", objectiveId: "find-stop-sign", mobilityGuideSeen: false });
+  });
+
+  it("persists completion of the manual sighted-guide introduction", () => {
+    patchSnapshot({ mobilityGuideSeen: true });
+    expect(loadSnapshot()).toMatchObject({ mobilityGuideSeen: true, resumeStage: "bus-stop-entry" });
+  });
+
+  it("persists unlocked sighted-guide tips without duplicating them", () => {
+    expect(getSnapshot().unlockedTips).toEqual([]);
+    unlockTip("sighted-guide");
+    unlockTip("sighted-guide");
+    expect(getSnapshot().unlockedTips).toEqual(["sighted-guide"]);
+    expect(loadSnapshot()?.unlockedTips).toEqual(["sighted-guide"]);
+  });
+
+  it("persists the bus accessibility tip without duplicating it", () => {
+    unlockTip("bus-access");
+    unlockTip("bus-access");
+    expect(getSnapshot().unlockedTips).toEqual(["bus-access"]);
+    expect(loadSnapshot()?.unlockedTips).toEqual(["bus-access"]);
+  });
+
   it("migrates V2 story state while discarding its broken wall-clock timer", () => {
     const legacy: GameSnapshotV2 = {
       version: 2, objectiveId: "follow-handrail", scene: "old-city", busState: "alighted", selectedSeatId: "seat-a2", memories: ["bus-rain"], detourScore: 2,
@@ -42,7 +69,7 @@ describe("V3 game snapshot", () => {
     localStorage.clear();
     localStorage.setItem(LEGACY_SAVE_KEY, JSON.stringify(legacy));
     const migrated = loadSnapshot();
-    expect(migrated).toMatchObject({ version: 3, scene: "old-city", objectiveId: "follow-handrail", resumeStage: "old-city-rail", activeElapsedMs: 0 });
+    expect(migrated).toMatchObject({ version: 3, scene: "old-city", objectiveId: "follow-handrail", resumeStage: "old-city-rail", activeElapsedMs: 0, mobilityGuideSeen: false, unlockedTips: [] });
     expect(migrated?.settings.ambientVolume).toBeGreaterThan(0);
     expect(localStorage.getItem(SAVE_KEY)).not.toBeNull();
     expect(localStorage.getItem(LEGACY_SAVE_KEY)).toBeNull();

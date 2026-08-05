@@ -1,9 +1,10 @@
 import Phaser from "phaser";
+import busWindowPanoramaUrl from "../assets/bus-window-panorama-pixel.png";
 import travelerWalkUrl from "../assets/traveler-walk.png";
+import travelerSitUrl from "../assets/traveler-sit.png";
 import lamUrl from "../assets/lam.png";
 import npcSpritesheetUrl from "../assets/npc-spritesheet.png";
 import { audioDirector } from "./audio";
-import { describePhonePosition, PHONE_COOLDOWN_MS } from "./assist";
 import { composeRepeatText, OBJECTIVES, OLD_CITY_CROSSING, OLD_CITY_HANDRAIL, PATHS, REVEAL_PROFILE, SCENE_LABELS, TACTILE_LIT_MS } from "./content";
 import { CROSSING_TILEMAP } from "./crossing-map";
 import { ensureCaneTextures, preloadEnvironmentAssets, renderMapDecoration, type EnvironmentSprite } from "./environment-art";
@@ -11,14 +12,14 @@ import { gameEvents } from "./events";
 import { constrainCrossingPosition, determineEnding, mergeColorMemory, resumePointForStage, transitionBus, transitionCrossing } from "./flow";
 import { deterministicTileVariant, ensureGroundTextures, GROUND_TEXTURE, type GroundTileKey, type GroundVisualState } from "./ground-tiles";
 import { BUS_INTERIOR_DOOR, BUS_INTERIOR_TILEMAP, BUS_SEAT_EDGE } from "./businterior-map";
-import { BUS_STOP_DECOY_SIGNS, BUS_STOP_DOOR, BUS_STOP_SIGN, BUS_STOP_TILEMAP } from "./busstop-map";
+import { BUS_STOP_DECOY_SIGNS, BUS_STOP_DOOR, BUS_STOP_GATE_ENTRY, BUS_STOP_PATH_START, BUS_STOP_SIGN, BUS_STOP_SIGN_PROBE_RADIUS, BUS_STOP_TILEMAP } from "./busstop-map";
 import { MAP_TILE_SIZE, OLD_CITY_TILEMAP } from "./oldcity-map";
 import { NPC_DEFINITIONS, type NpcDefinition } from "./npcs";
 import { RUINS_TILEMAP } from "./ruins-map";
-import { collectMemory, finishGame, getActiveElapsedMs, getSnapshot, patchSnapshot, setCheckpoint } from "./store";
+import { collectMemory, finishGame, getActiveElapsedMs, getSnapshot, patchSnapshot, setCheckpoint, unlockTip } from "./store";
 import { ensureTactileTextures, TACTILE_TEXTURE } from "./tactile-layer";
 import { describeDecisionBrick, rasterizeTactilePath, type TactileBrick } from "./tactile-tiles";
-import { isWalkable, movementUnderPoint, nearestSafeWalkablePoint, tileUnderPoint, type TileMapDefinition } from "./tilemap";
+import { isWalkable, movementUnderPoint, nearestSafeWalkablePoint, solidDecorationAt, tileUnderPoint, type MapDecoration, type TileMapDefinition } from "./tilemap";
 import type { BusTransitState, CaneSurfaceKind, ColorMemoryPoint, CrossingState, HudState, SceneId, TactilePathDefinition, TactilePathNode, TilePoint } from "./types";
 
 type Facing = "up" | "down" | "left" | "right";
@@ -33,6 +34,8 @@ type ColorPulse = TilePoint & { expiresAt: number; radius: number };
 
 const FACE_FRAME: Record<Facing, number> = { up: 1, left: 4, right: 7, down: 10 };
 const FACE_ROW: Record<Facing, number> = { up: 0, left: 1, right: 2, down: 3 };
+const NIGHT_GROUND_TINT = 0x000000;
+const NIGHT_TACTILE_TINT = 0x000000;
 const FACE_VECTOR: Record<Facing, Phaser.Math.Vector2> = {
   up: new Phaser.Math.Vector2(0, -1),
   down: new Phaser.Math.Vector2(0, 1),
@@ -56,6 +59,13 @@ function projectToSegment(point: Phaser.Math.Vector2, start: { x: number; y: num
   return { point: projected, t, distance: Phaser.Math.Distance.Between(point.x, point.y, projected.x, projected.y) };
 }
 
+function solidSurfaceLabel(kind: MapDecoration["kind"]): string {
+  if (kind === "gate-building") return "口岸墙体：实心建筑，无法穿过";
+  if (kind === "bench") return "长椅边缘：实心座位，请绕行";
+  if (kind === "stop-sign-17" || kind === "stop-sign-25") return "站牌立柱：金属立杆，牌面在上方";
+  return "实心障碍物：请绕行";
+}
+
 abstract class WalkScene extends Phaser.Scene {
   protected abstract sceneId: Exclude<SceneId, "bus-ride">;
   protected abstract spawn: Phaser.Math.Vector2;
@@ -73,8 +83,8 @@ abstract class WalkScene extends Phaser.Scene {
   protected subtitle = "";
   protected trackDetours = true;
   protected contact = "尚未触碰到物体";
-  protected phoneCooldownUntil = 0;
   private flashCooldownUntil = 0;
+  private flashUntil = 0;
   private lastDarkHintAt = -4000;
   protected groundSprites: Array<{ sprite: Phaser.GameObjects.Image; textures: Record<GroundVisualState, string>; frames?: Record<GroundVisualState, string>; x: number; y: number; environment: boolean }> = [];
   private colorPulses: ColorPulse[] = [];
@@ -108,6 +118,9 @@ abstract class WalkScene extends Phaser.Scene {
     if (!this.textures.exists("traveler-walk")) {
       this.load.spritesheet("traveler-walk", travelerWalkUrl, { frameWidth: 64, frameHeight: 64 });
     }
+    if (!this.textures.exists("traveler-sit")) {
+      this.load.image("traveler-sit", travelerSitUrl);
+    }
     if (!this.textures.exists("npc-spritesheet")) {
       this.load.spritesheet("npc-spritesheet", npcSpritesheetUrl, { frameWidth: 362, frameHeight: 362 });
     }
@@ -125,7 +138,7 @@ abstract class WalkScene extends Phaser.Scene {
     map.decorations.forEach((decoration) => {
       const rendered = renderMapDecoration(this, decoration);
       if (!rendered) return;
-      this.registerEnvironmentSprite(rendered);
+      (Array.isArray(rendered) ? rendered : [rendered]).forEach((sprite) => this.registerEnvironmentSprite(sprite));
     });
     const snapshot = getSnapshot();
     if (snapshot.scene === this.sceneId && OBJECTIVES[snapshot.objectiveId]?.scene === this.sceneId) this.objectiveId = snapshot.objectiveId;
@@ -175,7 +188,6 @@ abstract class WalkScene extends Phaser.Scene {
       interact: Phaser.Input.Keyboard.KeyCodes.E,
       hint: Phaser.Input.Keyboard.KeyCodes.Q,
       repeat: Phaser.Input.Keyboard.KeyCodes.H,
-      phone: Phaser.Input.Keyboard.KeyCodes.F,
       flash: Phaser.Input.Keyboard.KeyCodes.G,
       pause: Phaser.Input.Keyboard.KeyCodes.ESC,
       arrowUp: Phaser.Input.Keyboard.KeyCodes.UP,
@@ -183,7 +195,7 @@ abstract class WalkScene extends Phaser.Scene {
       arrowLeft: Phaser.Input.Keyboard.KeyCodes.LEFT,
       arrowRight: Phaser.Input.Keyboard.KeyCodes.RIGHT,
     }) as Record<string, Phaser.Input.Keyboard.Key>;
-    this.input.keyboard?.addCapture(["SPACE", "Q", "E", "F", "G", "UP", "DOWN", "LEFT", "RIGHT"]);
+    this.input.keyboard?.addCapture(["SPACE", "Q", "E", "G", "UP", "DOWN", "LEFT", "RIGHT"]);
     if (import.meta.env.DEV) {
       this.cleanupDevEvents.push(gameEvents.on("devTeleport", (point) => {
         this.player.setPosition(point.x, point.y);
@@ -250,14 +262,19 @@ abstract class WalkScene extends Phaser.Scene {
   private updateGroundColors(): void {
     if (!this.groundSprites.length) return;
     const pulses = this.colorPulses;
-    const memory = this.sceneColorMemory();
+    const night = this.isNightMode();
+    const memory = night ? [] : this.sceneColorMemory();
+    const flashed = this.time.now < this.flashUntil;
     for (const tile of this.groundSprites) {
-      const lit = pulses.some((pulse) => Phaser.Math.Distance.Between(tile.x, tile.y, pulse.x, pulse.y) <= pulse.radius);
+      const lit = flashed || pulses.some((pulse) => Phaser.Math.Distance.Between(tile.x, tile.y, pulse.x, pulse.y) <= pulse.radius);
       const remembered = !lit && memory.some((point) => Phaser.Math.Distance.Between(tile.x, tile.y, point.x, point.y) <= point.radius);
       const state: GroundVisualState = this.forceWarmForTile(tile) || lit ? "warm" : remembered ? "memory" : "base";
       const texture = tile.textures[state];
       const frame = tile.frames?.[state];
       if (tile.sprite.texture.key !== texture || (frame && tile.sprite.frame.name !== frame)) tile.sprite.setTexture(texture, frame);
+      const tint = night && state !== "warm" ? NIGHT_GROUND_TINT : null;
+      if (tint === null && tile.sprite.isTinted) tile.sprite.clearTint();
+      else if (tint !== null && (!tile.sprite.isTinted || tile.sprite.tintTopLeft !== tint)) tile.sprite.setTint(tint);
     }
   }
 
@@ -325,13 +342,17 @@ abstract class WalkScene extends Phaser.Scene {
       return;
     }
     this.updateInteraction(time);
-    this.player.setDepth(this.player.y + 1);
-    this.caneSprite.setDepth(this.player.y + 3);
+    this.player.setDepth(this.playerRenderDepth());
+    this.caneSprite.setDepth(this.facing === "up" ? this.player.y - 1 : this.player.y + 3);
     this.npcSprites.forEach(({ definition, sprite }) => sprite.setDepth(definition.y + 1));
     this.emitHud();
   }
 
   protected abstract updateInteraction(time: number): void;
+
+  protected playerRenderDepth(): number {
+    return this.player.y + 1;
+  }
 
   protected isNear(x: number, y: number, radius: number): boolean {
     return Phaser.Math.Distance.Between(this.player.x, this.player.y, x, y) <= radius;
@@ -394,6 +415,21 @@ abstract class WalkScene extends Phaser.Scene {
     return false;
   }
 
+  /** On the tactile path (or an equivalent guide like the handrail) movement keeps full speed. */
+  protected onGuidedPath(): boolean {
+    return this.distanceToRoute() <= 13;
+  }
+
+  /** When true, movement and cane taps are disabled (flash light or seated on a bench). */
+  protected controlsLocked(): boolean {
+    return this.time.now < this.flashUntil;
+  }
+
+  /** Night mode: fully black city, short-lived cane light, no persistent color memory. */
+  protected isNightMode(): boolean {
+    return getSnapshot().settings.gameMode === "night";
+  }
+
   protected repeatTaskText(): string {
     return `当前任务：${OBJECTIVES[this.objectiveId].label}`;
   }
@@ -436,7 +472,7 @@ abstract class WalkScene extends Phaser.Scene {
   }
 
   private updateMovement(time: number, delta: number): void {
-    if (this.roadReturning) return;
+    if (this.roadReturning || this.controlsLocked()) return;
     const input = this.getMovementInput();
     if (!input.lengthSq()) {
       if (this.player.anims.isPlaying) this.player.anims.stop();
@@ -449,7 +485,7 @@ abstract class WalkScene extends Phaser.Scene {
     let y = input.y;
     const map = this.tileMap();
     const onRoad = map ? movementUnderPoint(map, { x: this.player.x, y: this.player.y }) === "road" : false;
-    const speed = 68 * (onRoad ? 0.4 : 1);
+    const speed = 68 * (onRoad ? 0.4 : this.onGuidedPath() ? 1 : 0.35);
     const current = new Phaser.Math.Vector2(this.player.x, this.player.y);
     const next = this.constrainMovement(current, new Phaser.Math.Vector2(
       this.player.x + x * speed * (delta / 1000),
@@ -503,7 +539,7 @@ abstract class WalkScene extends Phaser.Scene {
   }
 
   private handleActions(time: number): void {
-    if (Phaser.Input.Keyboard.JustDown(this.keys.tap) && time - this.lastTapAt >= 220) {
+    if (Phaser.Input.Keyboard.JustDown(this.keys.tap) && !this.controlsLocked() && time - this.lastTapAt >= 220) {
       this.lastTapAt = time;
       this.revealMode = "tap";
       this.revealUntil = time + 180;
@@ -521,13 +557,6 @@ abstract class WalkScene extends Phaser.Scene {
       this.onHint(time);
       this.announce(`方向提示：目标在${this.directionToObjective()}。${OBJECTIVES[this.objectiveId].label}`);
     }
-    if (Phaser.Input.Keyboard.JustDown(this.keys.phone) && time >= this.phoneCooldownUntil) {
-      this.phoneCooldownUntil = time + PHONE_COOLDOWN_MS;
-      const target = OBJECTIVES[this.objectiveId].target;
-      const text = describePhonePosition(this.sceneId, { x: this.player.x, y: this.player.y }, this.path, target);
-      audioDirector.hint();
-      this.announce(`手机辅助：${text}`);
-    }
     if (Phaser.Input.Keyboard.JustDown(this.keys.flash) && time >= this.flashCooldownUntil) {
       this.flashCooldownUntil = time + 8000;
       this.performFlash(time);
@@ -539,14 +568,14 @@ abstract class WalkScene extends Phaser.Scene {
   }
 
   /**
-   * G key: a brief phone-torch flash. Pushes a large short-lived color pulse so the
-   * ground around the player returns to full warm color (and becomes walkable under
-   * the bright-ground rule), plus a quick full-screen warm flash overlay.
+   * G key: a brief phone-torch flash that lights the whole screen for ~1.5s.
+   * While the light lasts the player cannot move or tap (controlsLocked); it does
+   * not write color memory and does not affect walkability rules.
    */
   private performFlash(time: number): void {
-    this.colorPulses.push({ x: this.player.x, y: this.player.y, radius: 220, expiresAt: time + 1800 });
+    this.flashUntil = time + 1500;
     audioDirector.hint();
-    this.announce("你打开手机闪光灯，暖光照亮了周围的路面。");
+    this.announce("你打开手机闪光灯，四周霎时亮了起来。亮光散去前你无法移动。");
     if (getSnapshot().settings.reducedMotion) return;
     const overlay = this.add.rectangle(320, 180, 640, 360, 0xffe6b0, 0).setDepth(1000);
     this.tweens.add({
@@ -573,17 +602,18 @@ abstract class WalkScene extends Phaser.Scene {
   }
 
   private updateTactileLayer(time: number): void {
+    const night = this.isNightMode();
     for (let index = 0; index < this.tactileSprites.length; index += 1) {
-      const lit = time < this.tactileLitUntil[index];
+      const lit = time < this.tactileLitUntil[index] || time < this.flashUntil;
       const brick = this.tactileBricks[index];
       const sprite = this.tactileSprites[index];
       const key = brick.kind === "decision"
         ? lit ? TACTILE_TEXTURE.decisionLit : TACTILE_TEXTURE.decision
         : lit ? TACTILE_TEXTURE.guidanceLit : TACTILE_TEXTURE.guidance;
       if (sprite.texture.key !== key) sprite.setTexture(key);
-      const rememberedTint = !lit && this.tactileRemembered.has(index) ? 0xd9c79c : null;
+      const rememberedTint = !night && !lit && this.tactileRemembered.has(index) ? 0xd9c79c : null;
       const baseTint = this.tactileBaseTint[index] ?? 0xffffff;
-      const desiredTint = rememberedTint ?? (lit || baseTint === 0xffffff ? null : baseTint);
+      const desiredTint = rememberedTint ?? (night && !lit ? NIGHT_TACTILE_TINT : lit || baseTint === 0xffffff ? null : baseTint);
       if (desiredTint === null && sprite.isTinted) sprite.clearTint();
       else if (desiredTint !== null && (!sprite.isTinted || sprite.tintTopLeft !== desiredTint)) sprite.setTint(desiredTint);
     }
@@ -613,8 +643,9 @@ abstract class WalkScene extends Phaser.Scene {
   }
 
   private drawCane(time: number): void {
-    this.caneSprite.setPosition(Math.round(this.player.x + 2), Math.round(this.player.y - 28));
-    this.caneSprite.setAngle(this.facing === "right" ? 38 : this.facing === "left" ? -38 : 0);
+    const backView = this.facing === "up";
+    this.caneSprite.setAngle(this.facing === "right" ? 38 : this.facing === "left" ? -38 : backView ? -20 : 0);
+    this.caneSprite.setPosition(Math.round(this.player.x + (backView ? 10 : 2)), Math.round(this.player.y - 28));
     this.caneSprite.setTexture(`cane-${this.facing}-${time < this.tapExtensionUntil ? "tap" : "idle"}`);
   }
 
@@ -624,8 +655,10 @@ abstract class WalkScene extends Phaser.Scene {
   }
 
   private performCaneContact(time: number): void {
-    const probes = [18, 24, 30, 36, 42].map((distance) => this.detectCaneSurface(this.caneTip(distance)));
-    const surface = probes.find((candidate) => candidate.kind !== "stone") ?? probes[probes.length - 1];
+    const forwardProbes = [18, 24, 30, 36, 42].map((distance) => this.detectCaneSurface(this.caneTip(distance)));
+    const underfoot = this.detectCaneSurface(this.caneTip(0));
+    const surface = forwardProbes.find((candidate) => candidate.kind !== "stone")
+      ?? (underfoot.kind !== "stone" ? underfoot : forwardProbes[forwardProbes.length - 1]);
     const key = `${surface.kind}:${Math.round(surface.point.x / 12)}:${Math.round(surface.point.y / 12)}`;
     if (key === this.lastContactKey && time - this.lastContactAt < 360) return;
     this.lastContactKey = key;
@@ -641,9 +674,16 @@ abstract class WalkScene extends Phaser.Scene {
     audioDirector.caneTap(sound);
     this.enhanceTactileAt(surface.point, time);
     this.colorPulses.push({ x: surface.point.x, y: surface.point.y, radius: 42, expiresAt: time + TACTILE_LIT_MS });
+    const feet = this.caneTip(0);
+    if (Phaser.Math.Distance.Between(surface.point.x, surface.point.y, feet.x, feet.y) > 8) {
+      this.enhanceTactileAt(feet, time);
+      this.colorPulses.push({ x: feet.x, y: feet.y, radius: 30, expiresAt: time + TACTILE_LIT_MS });
+    }
     const snapshot = getSnapshot();
-    const colorMemory = mergeColorMemory(snapshot.colorMemory, { scene: this.sceneId, x: surface.point.x, y: surface.point.y, radius: 38 }, 32);
-    if (colorMemory !== snapshot.colorMemory) patchSnapshot({ colorMemory });
+    if (!this.isNightMode()) {
+      const colorMemory = mergeColorMemory(snapshot.colorMemory, { scene: this.sceneId, x: surface.point.x, y: surface.point.y, radius: 38 }, 32);
+      if (colorMemory !== snapshot.colorMemory) patchSnapshot({ colorMemory });
+    }
     this.onSurfaceContact(surface, time);
   }
 
@@ -665,6 +705,8 @@ abstract class WalkScene extends Phaser.Scene {
     }
 
     const map = this.tileMap();
+    const solid = map ? solidDecorationAt(map, tip) : null;
+    if (solid) return { kind: "obstacle", label: solidSurfaceLabel(solid.kind), point: tip };
     const tile = map ? tileUnderPoint(map, tip) : null;
     if (tile === "curb") return { kind: "curb", label: "路缘：台面升高，靠近后注意边界", point: tip };
     if (tile === "wall" || tile === "building" || tile === "fence" || tile === "bush") return { kind: "obstacle", label: "前方是阻挡物：请停下并回到凸纹", point: tip };
@@ -757,9 +799,13 @@ abstract class WalkScene extends Phaser.Scene {
 
 export class BusStopScene extends WalkScene {
   protected sceneId = "bus-stop" as const;
-  protected spawn = new Phaser.Math.Vector2(88, 268);
+  protected spawn = new Phaser.Math.Vector2(BUS_STOP_PATH_START.x, BUS_STOP_PATH_START.y);
   protected objectiveId = "find-stop-sign";
   private signConfirmed = false;
+  private seatedBench: { x: number; y: number } | null = null;
+  private standUpPoint: Phaser.Math.Vector2 | null = null;
+  private gateIntroState: "inactive" | "approaching" | "offer" = "inactive";
+  private gateHelper: Phaser.GameObjects.Sprite | null = null;
 
   constructor() {
     super("bus-stop");
@@ -767,10 +813,18 @@ export class BusStopScene extends WalkScene {
 
   protected onSceneReady(): void {
     const snapshot = getSnapshot();
-    this.drawStopSigns();
+    const closeTip = gameEvents.on("tipClosed", (tip) => {
+      if (tip.fromIntro && tip.id === "sighted-guide") this.finishGateIntro();
+    });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, closeTip);
+    this.events.once(Phaser.Scenes.Events.DESTROY, closeTip);
     if (snapshot.objectiveId === "board-17") this.signConfirmed = true;
+    if (!snapshot.mobilityGuideSeen && snapshot.resumeStage === "bus-stop-entry" && snapshot.busState === "waiting" && !this.signConfirmed) {
+      this.startGateIntro();
+      return;
+    }
     if (snapshot.busState === "waiting" && !this.signConfirmed) {
-      this.announce("雨刚停。先沿四纹盲道找到站牌，确认凸字17；站台右侧还有写着25的相似站牌。");
+      this.announce("雨刚停。先沿四纹盲道找到站牌，确认凸字17；沿途还有写着25的相似站牌。");
     } else if (snapshot.busState === "waiting" && this.signConfirmed) {
       this.announce("17路站牌已经确认。车门即将开启，请沿盲道前往候车区右侧。");
       this.time.delayedCall(700, () => {
@@ -789,10 +843,10 @@ export class BusStopScene extends WalkScene {
   }
 
   protected detectSceneSurface(tip: Phaser.Math.Vector2): CaneSurface | null {
-    if (Phaser.Math.Distance.Between(tip.x, tip.y, BUS_STOP_SIGN.x, BUS_STOP_SIGN.y) <= 22) {
+    if (Phaser.Math.Distance.Between(tip.x, tip.y, BUS_STOP_SIGN.x, BUS_STOP_SIGN.y) <= BUS_STOP_SIGN_PROBE_RADIUS) {
       return { kind: "sign", label: "站牌立柱：牌面有凸字「17」，确认这一班车", point: new Phaser.Math.Vector2(BUS_STOP_SIGN.x, BUS_STOP_SIGN.y) };
     }
-    const decoy = BUS_STOP_DECOY_SIGNS.find((sign) => Phaser.Math.Distance.Between(tip.x, tip.y, sign.x, sign.y) <= 22);
+    const decoy = BUS_STOP_DECOY_SIGNS.find((sign) => Phaser.Math.Distance.Between(tip.x, tip.y, sign.x, sign.y) <= BUS_STOP_SIGN_PROBE_RADIUS);
     if (decoy) return { kind: "sign", label: `相似站牌：牌面是凸字「${decoy.route}」，不是17路`, point: new Phaser.Math.Vector2(decoy.x, decoy.y) };
     if (Phaser.Math.Distance.Between(tip.x, tip.y, BUS_STOP_DOOR.x, BUS_STOP_DOOR.y) <= 20) {
       return { kind: "door", label: "车门边缘：确认站牌后，靠近按 E 上车", point: new Phaser.Math.Vector2(BUS_STOP_DOOR.x, BUS_STOP_DOOR.y) };
@@ -816,32 +870,134 @@ export class BusStopScene extends WalkScene {
     });
   }
 
-  private drawStopSigns(): void {
-    const draw = (point: { x: number; y: number }, route: string, correct: boolean): void => {
-      const sign = this.add.rectangle(point.x, point.y - 10, 22, 40, 0x8b8b86, 1).setStrokeStyle(3, 0x3f403f, 1).setDepth(point.y);
-      this.add.rectangle(point.x, point.y + 24, 4, 30, 0x595b59, 1).setDepth(point.y);
-      this.add.text(point.x, point.y - 13, route, { color: "#242321", backgroundColor: "#d6d2c7", fontFamily: "monospace", fontSize: "13px", fontStyle: "bold" }).setOrigin(0.5).setDepth(point.y + 1);
-      sign.setName(correct ? "bus-stop-sign-17" : "bus-stop-sign-25");
-    };
-    draw(BUS_STOP_SIGN, "17", true);
-    BUS_STOP_DECOY_SIGNS.forEach((sign) => draw(sign, sign.route, false));
-  }
-
   protected decisionHint(nodeIndex: number): string {
     if (this.path.nodes[nodeIndex]?.taskId === "board-17") return "4×4凸点：17路车门在右前方，靠近后按 E";
     return super.decisionHint(nodeIndex);
   }
 
   protected updateInteraction(): void {
+    if (this.gateIntroState !== "inactive") {
+      this.prompt = this.gateIntroState === "offer" ? "E  查看扶盲说明" : "";
+      if (this.gateIntroState === "offer" && this.interactionPressed()) {
+        unlockTip("sighted-guide");
+        gameEvents.emit("tipOpen", { id: "sighted-guide", fromIntro: true });
+      }
+      return;
+    }
+    if (this.seatedBench) {
+      this.prompt = "E  站起";
+      if (this.interactionPressed()) this.standUp();
+      return;
+    }
+    const bench = this.nearestBench(34);
+    if (bench) {
+      this.prompt = "E  坐下休息";
+      if (this.interactionPressed()) {
+        this.sitDown(bench);
+        return;
+      }
+    }
     const objective = OBJECTIVES[this.objectiveId];
     const near = this.isNear(objective.target.x, objective.target.y, objective.triggerRadius);
-    this.prompt = near ? (getSnapshot().busState === "doorOpen" ? "E  上车" : "请稍等车门开启") : "";
-    if (near && getSnapshot().busState === "doorOpen" && this.interactionPressed()) {
+    const snapshot = getSnapshot();
+    const doorOpen = snapshot.busState === "doorOpen";
+    if (!bench && near && doorOpen && !snapshot.unlockedTips.includes("bus-access")) {
+      unlockTip("bus-access");
+      this.prompt = "已解锁：帮助盲人乘车";
+      gameEvents.emit("tipOpen", { id: "bus-access", fromIntro: false });
+      return;
+    }
+    if (!bench) this.prompt = near ? (doorOpen ? "E  上车" : "请稍等车门开启") : "";
+    if (near && doorOpen && this.interactionPressed()) {
       audioDirector.interact();
       patchSnapshot({ busState: transitionBus("doorOpen", "board"), objectiveId: "find-seat", scene: "bus-interior", resumeStage: "bus-interior-entry" });
       gameEvents.emit("chapter", { from: "bus-stop", to: "bus-interior" });
       this.scene.start("bus-interior");
     }
+  }
+
+  protected suspendRouteTracking(): boolean {
+    return !!this.seatedBench || this.gateIntroState !== "inactive";
+  }
+
+  protected controlsLocked(): boolean {
+    return !!this.seatedBench || this.gateIntroState !== "inactive" || super.controlsLocked();
+  }
+
+  protected playerRenderDepth(): number {
+    return this.seatedBench ? this.seatedBench.y + 2 : super.playerRenderDepth();
+  }
+
+  private nearestBench(radius: number): { x: number; y: number } | null {
+    const map = this.tileMap();
+    if (!map) return null;
+    return map.decorations
+      .filter((decoration) => decoration.kind === "bench")
+      .map((bench) => ({ bench, distance: Phaser.Math.Distance.Between(this.player.x, this.player.y, bench.x, bench.y) }))
+      .filter((entry) => entry.distance <= radius)
+      .sort((a, b) => a.distance - b.distance)[0]?.bench ?? null;
+  }
+
+  private sitDown(bench: { x: number; y: number }): void {
+    this.standUpPoint = new Phaser.Math.Vector2(this.player.x, this.player.y);
+    this.seatedBench = bench;
+    this.player.setPosition(bench.x, bench.y - 8);
+    this.facing = "down";
+    if (this.player.anims.isPlaying) this.player.anims.stop();
+    this.player.setTexture("traveler-sit");
+    this.caneSprite.setVisible(false);
+    audioDirector.interact();
+    this.announce("你在长椅上坐下，听雨点敲在站亭顶上。");
+  }
+
+  private standUp(): void {
+    const back = this.standUpPoint;
+    this.seatedBench = null;
+    this.standUpPoint = null;
+    if (back) this.player.setPosition(back.x, back.y);
+    this.player.setTexture("traveler-walk", FACE_FRAME[this.facing]);
+    this.caneSprite.setVisible(true);
+    audioDirector.interact();
+    this.announce("你站起身，握紧盲杖。");
+  }
+
+  private startGateIntro(): void {
+    this.gateIntroState = "approaching";
+    this.player.setPosition(BUS_STOP_GATE_ENTRY.x, BUS_STOP_GATE_ENTRY.y);
+    this.facing = "down";
+    this.player.setFrame(FACE_FRAME.down);
+    this.caneSprite.setVisible(true);
+    this.gateHelper = this.add.sprite(476, 164, "npc-spritesheet", 4).setScale(0.16).setFlipX(true).setDepth(165);
+    this.announce("你刚走出拱北口岸，在门前停下。一名工作人员从右侧走来。");
+    this.tweens.add({
+      targets: this.gateHelper,
+      x: 364,
+      y: 128,
+      duration: getSnapshot().settings.reducedMotion ? 1 : 1800,
+      ease: "Stepped",
+      easeParams: [14],
+      onUpdate: () => this.gateHelper?.setDepth((this.gateHelper?.y ?? 128) + 1),
+      onComplete: () => {
+        if (!this.gateHelper) return;
+        this.gateHelper.setFlipX(true);
+        this.gateIntroState = "offer";
+        this.announce("工作人员：你好，我是口岸工作人员。需要我带你到盲道起点吗？我会先把手臂递给你，并把前方路况说清楚。");
+      },
+    });
+  }
+
+  private finishGateIntro(): void {
+    if (this.gateIntroState !== "offer") return;
+    patchSnapshot({ mobilityGuideSeen: true });
+    this.player.setPosition(this.spawn.x, this.spawn.y);
+    this.facing = "right";
+    this.player.setTexture("traveler-walk", FACE_FRAME.right);
+    this.caneSprite.setVisible(true);
+    this.gateHelper?.destroy();
+    this.gateHelper = null;
+    this.gateIntroState = "inactive";
+    this.cameras.main.fadeIn(getSnapshot().settings.reducedMotion ? 1 : 180, 58, 55, 49);
+    this.announce("工作人员把你送到盲道起点：前方是四条凸纹，沿线可到17路候车区。你向他道谢，重新握好盲杖。");
   }
 }
 
@@ -905,9 +1061,17 @@ export class BusRideScene extends Phaser.Scene {
   private startedAt = 0;
   private ended = false;
   private keys!: { skip: Phaser.Input.Keyboard.Key; pause: Phaser.Input.Keyboard.Key };
+  private panorama!: Phaser.GameObjects.TileSprite;
+  private scrollAccumulator = 0;
+  private shakeAccumulator = 0;
+  private shakeOffset = 0;
 
   constructor() {
     super("bus-ride");
+  }
+
+  preload(): void {
+    if (!this.textures.exists("bus-window-panorama")) this.load.image("bus-window-panorama", busWindowPanoramaUrl);
   }
 
   create(): void {
@@ -917,10 +1081,18 @@ export class BusRideScene extends Phaser.Scene {
       const variant = deterministicTileVariant("bus-ride", colIndex, rowIndex, key);
       this.add.image(colIndex * 16 + 8, rowIndex * 16 + 12, GROUND_TEXTURE[key].base[variant]);
     }));
-    const windowModule = renderMapDecoration(this, { kind: "bus-window", x: 320, y: 92, width: 620, height: 82, depth: 80 });
-    if (windowModule && !getSnapshot().settings.reducedMotion) this.tweens.add({ targets: windowModule.sprite, x: 316, duration: 2200, yoyo: true, repeat: -1, ease: "Sine.inOut" });
+    this.panorama = this.add.tileSprite(320, 82, 620, 96, "bus-window-panorama").setDepth(80);
+    const windowFrame = this.add.graphics().setDepth(82);
+    windowFrame.fillStyle(0x302d29, 1);
+    windowFrame.fillRect(4, 28, 632, 8);
+    windowFrame.fillRect(4, 130, 632, 8);
+    windowFrame.fillRect(4, 28, 8, 110);
+    windowFrame.fillRect(628, 28, 8, 110);
+    [160, 320, 480].forEach((x) => windowFrame.fillRect(x - 3, 34, 6, 96));
+    windowFrame.fillStyle(0x8d887e, 0.9);
+    windowFrame.fillRect(12, 36, 616, 2);
     [132, 252, 388, 508].forEach((x) => renderMapDecoration(this, { kind: "bus-pole", x, y: 356, width: 10, height: 220, depth: 200 }));
-    this.add.rectangle(320, 180, 640, 360, 0x6b6257, 0.08);
+    this.add.rectangle(320, 180, 640, 360, 0x6b6257, 0.06).setDepth(300);
     const state = getSnapshot().busState === "seated" ? transitionBus("seated", "depart") : "riding";
     patchSnapshot({ busState: state as BusTransitState, scene: "bus-ride", objectiveId: "ride-to-camoes" });
     this.keys = {
@@ -949,7 +1121,22 @@ export class BusRideScene extends Phaser.Scene {
     this.time.delayedCall(21000, () => this.finishRide());
   }
 
-  update(): void {
+  update(_time: number, delta: number): void {
+    if (!getSnapshot().settings.reducedMotion) {
+      this.scrollAccumulator += delta;
+      while (this.scrollAccumulator >= 120) {
+        this.scrollAccumulator -= 120;
+        this.panorama.tilePositionX = Math.round(this.panorama.tilePositionX + 2);
+      }
+      this.shakeAccumulator += delta;
+      if (this.shakeAccumulator >= 240) {
+        this.shakeAccumulator %= 240;
+        this.shakeOffset = this.shakeOffset ? 0 : 1;
+        this.cameras.main.setScroll(0, this.shakeOffset);
+      }
+    } else if (this.cameras.main.scrollY !== 0) {
+      this.cameras.main.setScroll(0, 0);
+    }
     if (Phaser.Input.Keyboard.JustDown(this.keys.pause)) {
       this.scene.pause();
       gameEvents.emit("pause", true);
@@ -1023,6 +1210,10 @@ export class OldCityScene extends WalkScene {
 
   protected requiresBrightGround(): boolean {
     return !this.railHeld;
+  }
+
+  protected onGuidedPath(): boolean {
+    return this.railHeld || super.onGuidedPath();
   }
 
   protected constrainMovement(current: Phaser.Math.Vector2, next: Phaser.Math.Vector2): Phaser.Math.Vector2 {

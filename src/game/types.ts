@@ -73,6 +73,20 @@ export type BusTransitState =
 
 export type MemoryId = "bus-rain" | "old-city-bell" | "border-hand";
 export type EndingId = "reunion" | "detour" | "return";
+export type TipId = "sighted-guide" | "bus-access";
+
+export type TipDefinition = {
+  id: TipId;
+  title: string;
+  heading: string;
+  summary: string;
+  image: string;
+  imageAlt: string;
+  steps: readonly { title: string; body: string }[];
+  callout: string;
+};
+
+export type GameMode = "experience" | "night";
 
 export type GameSettings = {
   masterVolume: number;
@@ -81,9 +95,10 @@ export type GameSettings = {
   dialogueVolume: number;
   subtitleScale: number;
   reducedMotion: boolean;
+  gameMode: GameMode;
 };
 
-export type LegacyGameSettings = Omit<GameSettings, "ambientVolume">;
+export type LegacyGameSettings = Omit<GameSettings, "ambientVolume" | "gameMode">;
 
 export type ResumeStage =
   | "bus-stop-entry"
@@ -115,6 +130,8 @@ export type GameSnapshotV2 = {
 
 export type GameSnapshotV3 = {
   version: 3;
+  mobilityGuideSeen: boolean;
+  unlockedTips: TipId[];
   objectiveId: string;
   scene: SceneId;
   resumeStage: ResumeStage;
