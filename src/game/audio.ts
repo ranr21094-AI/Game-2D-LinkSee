@@ -11,6 +11,7 @@ const AMBIENT_URLS: Record<AmbientId, string> = { rain: rainUrl, traffic: traffi
 const SCENE_AMBIENCE: Record<SceneId, Partial<Record<AmbientId, number>>> = {
   "bus-stop": { rain: 0.5, traffic: 0.34 },
   "bus-interior": { bus: 0.56 },
+  "bus-ride": { bus: 0.62, rain: 0.18 },
   "old-city": { rain: 0.4, traffic: 0.5 },
   ruins: { rain: 0.34, traffic: 0.08 },
 };
@@ -90,7 +91,7 @@ class AudioDirector {
     });
   }
 
-  private tone(frequency: number, duration: number, volume: number, type: OscillatorType): void {
+  private tone(frequency: number, duration: number, volume: number, type: OscillatorType, pan = 0): void {
     if (!this.context || this.paused) return;
     const now = this.context.currentTime;
     const oscillator = this.context.createOscillator();
@@ -100,7 +101,13 @@ class AudioDirector {
     const settings = getSnapshot().settings;
     gain.gain.setValueAtTime(Math.max(0.001, volume * settings.masterVolume * settings.effectsVolume), now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-    oscillator.connect(gain).connect(this.context.destination);
+    if (typeof this.context.createStereoPanner === "function") {
+      const panner = this.context.createStereoPanner();
+      panner.pan.setValueAtTime(Math.max(-1, Math.min(1, pan)), now);
+      oscillator.connect(gain).connect(panner).connect(this.context.destination);
+    } else {
+      oscillator.connect(gain).connect(this.context.destination);
+    }
     oscillator.start(now);
     oscillator.stop(now + duration);
   }
@@ -115,10 +122,10 @@ class AudioDirector {
     window.speechSynthesis.speak(utterance);
   }
 
-  caneTap(kind: "tactile" | "stone" | "metal" | "obstacle" = "tactile"): void {
+  caneTap(kind: "tactile" | "stone" | "metal" | "fabric" | "obstacle" = "tactile"): void {
     this.unlock();
-    const frequency = kind === "tactile" ? 680 : kind === "metal" ? 940 : kind === "obstacle" ? 185 : 330;
-    this.tone(frequency, kind === "metal" ? 0.14 : kind === "obstacle" ? 0.18 : 0.08, 0.08, kind === "metal" ? "triangle" : "square");
+    const frequency = kind === "tactile" ? 680 : kind === "metal" ? 940 : kind === "fabric" ? 118 : kind === "obstacle" ? 185 : 330;
+    this.tone(frequency, kind === "metal" ? 0.14 : kind === "obstacle" || kind === "fabric" ? 0.18 : 0.08, kind === "fabric" ? 0.045 : 0.08, kind === "metal" ? "triangle" : kind === "fabric" ? "sine" : "square");
   }
 
   footstep(surface: GroundTileKey | null): void {
@@ -131,7 +138,9 @@ class AudioDirector {
   hint(): void { this.unlock(); this.tone(780, 0.18, 0.045, "sine"); }
   door(): void { this.unlock(); this.tone(220, 0.28, 0.07, "sawtooth"); }
   interact(): void { this.unlock(); this.tone(520, 0.1, 0.05, "sine"); }
+  listenCue(frequency: number, pan = 0): void { this.unlock(); this.tone(frequency, 0.32, 0.055, "sine", pan); }
   crossingWait(): void { this.unlock(); this.tone(260, 0.22, 0.055, "sine"); }
+  cooldown(): void { this.unlock(); this.tone(142, 0.1, 0.035, "sine"); }
   crossingWalk(): void { this.unlock(); this.tone(760, 0.12, 0.06, "sine"); window.setTimeout(() => this.tone(920, 0.16, 0.05, "sine"), 150); }
 }
 

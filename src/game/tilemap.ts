@@ -28,7 +28,8 @@ export type DecorationKind =
   | "stop-sign-17"
   | "stop-sign-25"
   | "shop-sign"
-  | "shop-front";
+  | "shop-front"
+  | "egg-tart-stall";
 
 export type MapDecoration = {
   kind: DecorationKind;

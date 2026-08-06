@@ -47,14 +47,14 @@ const BUS_MODULE_KINDS: Partial<Record<DecorationKind, BusModuleKey>> = {
   "bus-light": "light",
 };
 
-const PROGRAMMATIC_KINDS = ["shelter", "bus", "bench", "lamp", "signal", "ramp-rail", "bus-window", "bus-pole", "bus-seat-row", "bus-driver-seat", "stop-sign-17", "stop-sign-25", "shop-front"] as const;
+const PROGRAMMATIC_KINDS = ["shelter", "bus", "bench", "lamp", "signal", "ramp-rail", "bus-window", "bus-pole", "bus-seat-row", "bus-driver-seat", "stop-sign-17", "stop-sign-25", "shop-front", "egg-tart-stall"] as const;
 type ProgrammaticKind = (typeof PROGRAMMATIC_KINDS)[number];
 
-type Palette = { stone: string; dark: string; light: string; metal: string; glow: string; red: string };
+type Palette = { stone: string; dark: string; light: string; metal: string; glow: string; red: string; green: string; cream: string; wood: string; tart: string };
 const PALETTES: Record<GroundVisualState, Palette> = {
-  base: { stone: "#777777", dark: "#383838", light: "#a4a4a4", metal: "#646464", glow: "#b2b2b2", red: "#686868" },
-  memory: { stone: "#817b70", dark: "#3e3b37", light: "#aaa293", metal: "#6d6961", glow: "#c4ac7b", red: "#806a61" },
-  warm: { stone: "#96816d", dark: "#3e3731", light: "#c2aa88", metal: "#77756d", glow: "#e4b45f", red: "#a85149" },
+  base: { stone: "#777777", dark: "#383838", light: "#a4a4a4", metal: "#646464", glow: "#b2b2b2", red: "#686868", green: "#626262", cream: "#a2a2a2", wood: "#686868", tart: "#adadad" },
+  memory: { stone: "#817b70", dark: "#3e3b37", light: "#aaa293", metal: "#6d6961", glow: "#c4ac7b", red: "#806a61", green: "#626b5e", cream: "#b2a993", wood: "#806a55", tart: "#c6a86c" },
+  warm: { stone: "#96816d", dark: "#3e3731", light: "#c2aa88", metal: "#77756d", glow: "#e4b45f", red: "#a85149", green: "#425f4b", cream: "#e5d7b3", wood: "#855a38", tart: "#f2c55c" },
 };
 
 function rect(ctx: CanvasRenderingContext2D, color: string, x: number, y: number, width: number, height: number): void {
@@ -113,6 +113,33 @@ function drawBusDriver(ctx: CanvasRenderingContext2D, state: GroundVisualState):
   rect(ctx, p.dark, 39, 44, 9, 10);
   rect(ctx, p.metal, 45, 51, 12, 5);
   rect(ctx, p.glow, 54, 29, 5, 3);
+}
+
+function drawEggTartVendor(ctx: CanvasRenderingContext2D, state: GroundVisualState): void {
+  const p = PALETTES[state];
+  ctx.clearRect(0, 0, 64, 64);
+  // Shared 64px human scale: feet at y=62, head height and shoulders align
+  // with the traveler sprite, with a small tray held at waist height.
+  rect(ctx, p.dark, 23, 8, 20, 4);
+  rect(ctx, p.wood, 21, 12, 24, 18);
+  rect(ctx, p.cream, 24, 14, 18, 13);
+  rect(ctx, p.dark, 21, 20, 4, 9);
+  rect(ctx, p.dark, 26, 10, 16, 4);
+  rect(ctx, p.green, 20, 29, 25, 22);
+  rect(ctx, p.cream, 25, 31, 15, 18);
+  rect(ctx, p.dark, 18, 31, 5, 20);
+  rect(ctx, p.dark, 43, 31, 5, 20);
+  rect(ctx, p.wood, 16, 39, 34, 7);
+  rect(ctx, p.cream, 18, 40, 30, 2);
+  [21, 31, 41].forEach((x) => {
+    rect(ctx, p.wood, x, 35, 7, 5);
+    rect(ctx, p.tart, x + 1, 34, 5, 4);
+    rect(ctx, p.dark, x + 2, 35, 3, 1);
+  });
+  rect(ctx, p.dark, 23, 50, 8, 11);
+  rect(ctx, p.dark, 36, 50, 8, 11);
+  rect(ctx, p.metal, 20, 60, 13, 3);
+  rect(ctx, p.metal, 35, 60, 13, 3);
 }
 
 function drawProgrammatic(ctx: CanvasRenderingContext2D, kind: DecorationKind, width: number, height: number, state: GroundVisualState, orientation?: BusSeatOrientation): void {
@@ -210,9 +237,44 @@ function drawProgrammatic(ctx: CanvasRenderingContext2D, kind: DecorationKind, w
       rect(ctx, p.glow, x + 2, awningHeight + 12, 12, 9);
       rect(ctx, p.metal, x + 2, awningHeight + 22, 12, 4);
     });
+  } else if (kind === "egg-tart-stall") {
+    // Six-tile Macau street cart: muted green/cream canopy, dark timber,
+    // brass oven and a small tray of custard tarts as the warm focal point.
+    for (let x = 0; x < width; x += 12) rect(ctx, Math.floor(x / 12) % 2 === 0 ? p.green : p.cream, x, 0, Math.min(12, width - x), 13);
+    rect(ctx, p.dark, 0, 13, width, 3);
+    rect(ctx, p.metal, 4, 16, 4, height - 20);
+    rect(ctx, p.metal, width - 8, 16, 4, height - 20);
+    rect(ctx, p.wood, 4, height - 31, width - 8, 23);
+    rect(ctx, p.dark, 7, height - 28, 30, 17);
+    rect(ctx, p.metal, 10, height - 25, 24, 11);
+    rect(ctx, p.glow, 13, height - 23, 18, 6);
+    rect(ctx, p.dark, 42, height - 28, width - 49, 4);
+    [46, 58, 70, 82].forEach((x) => {
+      if (x + 8 >= width) return;
+      rect(ctx, p.wood, x, height - 23, 8, 6);
+      rect(ctx, p.tart, x + 1, height - 24, 6, 4);
+      rect(ctx, p.dark, x + 2, height - 23, 4, 1);
+    });
+    rect(ctx, p.dark, 0, height - 9, width, 4);
+    rect(ctx, p.dark, 10, height - 7, 14, 7);
+    rect(ctx, p.dark, width - 24, height - 7, 14, 7);
   } else if (kind === "bus-seat-row" || kind === "bus-driver-seat") {
     drawBusSeat(ctx, width, height, state, kind === "bus-driver-seat" ? "driver" : (orientation ?? "upper"));
   }
+}
+
+export function ensureEggTartVendorTextures(scene: Phaser.Scene): Record<GroundVisualState, string> {
+  const textures = {} as Record<GroundVisualState, string>;
+  STATES.forEach((state) => {
+    const key = `egg-tart-vendor-${state}`;
+    textures[state] = key;
+    if (scene.textures.exists(key)) return;
+    const texture = scene.textures.createCanvas(key, 64, 64);
+    if (!texture) return;
+    drawEggTartVendor(texture.getContext(), state);
+    texture.refresh();
+  });
+  return textures;
 }
 
 export function preloadEnvironmentAssets(scene: Phaser.Scene): void {

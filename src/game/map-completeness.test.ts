@@ -5,7 +5,7 @@ import { OBJECTIVES, PATHS } from "./content";
 import { deterministicTileVariant } from "./ground-tiles";
 import { OLD_CITY_TILEMAP } from "./oldcity-map";
 import { RUINS_TILEMAP } from "./ruins-map";
-import { movementAt, nearestSafeWalkablePoint, tileAt, validateTileMap, type TileMapDefinition } from "./tilemap";
+import { isWalkable, movementAt, nearestSafeWalkablePoint, tileAt, validateTileMap, type TileMapDefinition } from "./tilemap";
 
 const MAPS: Record<string, TileMapDefinition> = {
   "bus-stop": BUS_STOP_TILEMAP,
@@ -42,6 +42,14 @@ describe("complete scene maps", () => {
         const covered = point.x > decoration.x - decoration.width / 2 && point.x < decoration.x + decoration.width / 2 && point.y > decoration.y - decoration.height && point.y < decoration.y;
         expect(covered, `${scene} point ${point.x},${point.y} covered by ${decoration.kind}`).toBe(false);
       }));
+    });
+  });
+
+  it("keeps every concrete objective target on reachable ground", () => {
+    Object.values(OBJECTIVES).forEach((objective) => {
+      if (!objective.target.x && !objective.target.y) return;
+      const map = MAPS[objective.scene];
+      expect(isWalkable(map, objective.target), `${objective.id} target should be walkable`).toBe(true);
     });
   });
 

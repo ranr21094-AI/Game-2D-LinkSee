@@ -1,5 +1,10 @@
 # Prototype Instructions
 
+## 2026-08-06 implementation scope (confirmed with owner)
+
+- Improve the normal game experience according to `D:\Desktop\linksee\plan1.md`; do not add demo-only shortcuts, jump flows, or a separate demo mode.
+- Priorities are visible bugs first, then deeper NPC/environment interaction, then page/HUD/scene polish while preserving the established pixel-art and accessibility direction.
+
 Run the local server yourself and open the preview in the browser available to this environment. Do not give the user server-start instructions when you can run it.
 
 Before making substantial visual changes, use the Product Design plugin's `get-context` skill when the visual source is unclear or no longer matches the current goal. When the user gives durable prototype-specific design feedback, preferences, or decisions, record them in `AGENTS.md`.
@@ -35,7 +40,7 @@ When implementing from a selected generated mock, treat that image as the source
 
 - Two game modes selectable on the title screen and in the pause menu (`settings.gameMode`): the existing presentation is 体验模式 (experience); 黑夜模式 (night) starts fully black — unlit ground and tactile bricks render pure black (tints 0x000000, completely invisible), cane light lasts the usual ~2s then fades back to black with NO persistent color memory (mergeColorMemory is skipped). Q behaves identically in both modes: the direction arrow toward the objective plus the spoken direction text (the night-mode objective-light-pulse variant was reverted).
 - `startNewGame` preserves settings (mode and volumes) instead of resetting to defaults.
-- Both modes: full speed only on the tactile path (within 13px of a route segment); off-path walkable/crossing ground slows to 50%. The road keeps its own 0.4 penalty without stacking.
+- Both modes: full speed only on the tactile path (within 13px of a route segment); every traversable outdoor surface away from tactile paving, including crossing and road cells, is exactly 35% of tactile-path speed. The intentionally pathless bus interior remains full speed. No road multiplier stacks with the 0.35 factor.
 - Both modes: G (flash) lights the WHOLE screen for ~1.5s — every ground tile renders warm and every tactile brick renders lit with no radius limit — and locks movement and cane taps for the duration (Q/H still work); cooldown 8s. It no longer pushes a radius-220 color pulse and never writes color memory.
 
 ## 2026-08-05 merged old-city level (confirmed with owner)
@@ -45,7 +50,7 @@ When implementing from a selected generated mock, treat that image as the source
 - No vector guide line for the crossing: during the walk phase the zebra tiles themselves glow slightly (0xffd477/0.22). Two programmatic pedestrian signals (west + far curb) switch red/green with the crossing state.
 - Shop bodies (2026-08-06 update, confirmed with owner): the plain tile blocks looked too bare, so shop buildings now reuse the EXISTING macau-architecture atlas crops (arcade/arcade-house/corner-house/low-house/stone-gate) as decorations — central block gets a street-facing arcade with two houses behind it, the bank a corner-house, pet/pawn stacked low-houses, the south shops low-houses plus a stone-gate at the SE corner. No NEW AI images. Signboards stay programmatic `shop-sign` decorations (`label` + optional `signVertical`) with explicit `depth` set above their building's base-y depth (architecture sprites depth-sort by base y). The unused `shop-front` programmatic kind remains in environment-art.ts for future use. No real brands. Names: 祐记士多、海风咖啡、德兴茶楼、濠江银号、猫记宠物、同德按、灯塔葡挞、安记饼家. Cane touch points for each sign live in `SHOP_SIGNS` (oldcity-map.ts).
 - The zebra ground tile stripes are horizontal (stripes run along the pedestrian's east-west travel).
-- Save bumped to v4 (`sound-road-macau-2d:v4`); v2/v3 saves are discarded, the v2 migration path is deleted. ResumeStages for the level: `old-city-entry` / `old-city-wait` / `old-city-go` / `old-city-street`. Both NPC helpers now live in `old-city` with a per-NPC `frame` field.
+- Save v4 (`sound-road-macau-2d:v4`) is the migration source for Plan 2's v5 save; v2/v3 saves remain discarded. ResumeStages for the level: `old-city-entry` / `old-city-wait` / `old-city-go` / `old-city-street`. Old-city NPC helpers live in `old-city` with a per-NPC frame or a project-drawn 64px texture.
 - Mandatory pet-shop beat (2026-08-06, confirmed with owner): the north tactile leg gains a decision brick at the pet-shop door (`visit-pet-shop` objective, target (536,140), interact). Pressing E opens the mandatory `guide-dog-access` tip「导盲犬在澳门」— Macau has no guide-dog system: dogs enter only as "pets" through complex quarantine/isolation, purchases need a legislator's case-by-case help, and the government favors low-cost "electronic guide dogs" (robots) that still fail on stairs and complex terrain. The terminus objective only unlocks after the tip is closed (tipClosed with source `"pet-shop"`). Illustration `guide-dog-tip-pixel.png` (Seedream, 960×480, registered in ASSET_SOURCES.md).
 
 ## 2026-08-04 rework decisions
@@ -77,3 +82,11 @@ When implementing from a selected generated mock, treat that image as the source
 - Milestone order: M1 validates the Camoes Garden segment (alight → tactile turn → find the rail); M2 bus segment; M3 old city density, crossing, full-color finale at the Ruins; M4 NPCs and delivery. Full plan: `docs/q-align/rework-plan.md`.
 
 Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts/prepare-sites-build.mjs`, and `tests/sites-worker.test.mjs` intact so the same local prototype can be handed to Sites. Before a Sites handoff, run `npm run build` and `npm run test:sites`; the build must leave `dist/client/index.html`, `dist/server/index.js`, and `dist/.openai/hosting.json`.
+
+## 2026-08-06 Plan 2 decisions (confirmed with owner)
+
+- The journey opens with Lin's voice message and an old-photo promise. A persistent journey goal says the visually impaired traveler is going to the Ruins of St. Paul's to reunite with old friend Lin; the immediate objective remains a separate, higher-priority HUD line.
+- R is active listening: a 1.2s stationary focus with a 2s cooldown, directional text and audio for real nearby landmarks. Q remains objective direction, Space remains the 18-42px cane probe, and G remains the full-screen flash.
+- The old city gains a project-drawn egg-tart stall beside, never on, the tactile route. Entering its explicit 6x3 scent-tile zone once announces “你被蛋挞的香气环绕”. Buying once grants 60,000ms of controllable-play time at 1.60x current movement speed; it never stacks or refreshes and preserves the exact 0.35 off-path/path ratio.
+- Standing human characters use a 64x64 logical frame, shared foot baseline and nearest-neighbor rendering. Seated and wheelchair silhouettes may be wider, but head and torso scale must match the protagonist.
+- Visual thesis: a warm-gray Macau after rain, with brass-gold sensory highlights and locally restored color; content arc: voice promise → sensory journey → street-life choice → reunion; interaction thesis: cane color pulses, a restrained listening ripple, and short pixel-step modal transitions.

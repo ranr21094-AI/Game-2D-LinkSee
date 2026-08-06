@@ -73,6 +73,33 @@ export type ShopSign = {
   hint: string;
 };
 
+export type VerticalInteractionZone = {
+  x: number;
+  minY: number;
+  maxY: number;
+  radius: number;
+};
+
+/**
+ * The pet shop uses a tall vertical sign, so its visible "door front" is a
+ * length of the northbound arcade rather than one pixel-perfect point.
+ * Keep the zone on the walkable tactile corridor beside the facade.
+ */
+export const PET_SHOP_INTERACTION_ZONE: VerticalInteractionZone = {
+  x: 536,
+  minY: 132,
+  maxY: 196,
+  radius: 32,
+};
+
+export function isInsideVerticalInteractionZone(
+  point: { x: number; y: number },
+  zone: VerticalInteractionZone,
+): boolean {
+  const closestY = Math.max(zone.minY, Math.min(zone.maxY, point.y));
+  return Math.hypot(point.x - zone.x, point.y - closestY) <= zone.radius;
+}
+
 /** 八家商铺的杖触点与触觉反馈文案（无品牌虚构名）。 */
 export const SHOP_SIGNS: readonly ShopSign[] = [
   { id: "store", name: "祐记士多", touch: { x: 304, y: 260 }, hint: "招牌「祐记士多」：便利店门口" },
@@ -110,13 +137,15 @@ export const OLD_CITY_TILEMAP: TileMapDefinition = {
     { kind: "low-house", x: 598, y: 240, width: 78, height: 60, flipX: true },
     { kind: "low-house", x: 600, y: 292, width: 78, height: 60 },
     { kind: "shop-sign", x: 566, y: 290, width: 20, height: 50, depth: 293, label: "同德按", signVertical: true },
+    // 原创蛋挞摊贴在骑楼服务面，实体底座停在盲道之外；前方 6×3 香气格覆盖可行走区域。
+    { kind: "egg-tart-stall", x: 344, y: 260, width: 96, height: 64, depth: 259, solid: true, solidWidth: 96, solidHeight: 12 },
     // 南侧蘭挞店 / 饼家 / 东南角石门楼（小巷两侧留空）。
     { kind: "low-house", x: 304, y: 356, width: 92, height: 62 },
     { kind: "shop-sign", x: 304, y: 320, width: 68, height: 18, depth: 357, label: "灯塔葡挞" },
     { kind: "low-house", x: 448, y: 356, width: 92, height: 62, flipX: true },
     { kind: "shop-sign", x: 448, y: 320, width: 68, height: 18, depth: 357, label: "安记饼家" },
     { kind: "stone-gate", x: 580, y: 356, width: 118, height: 62 },
-    { kind: "lamp", x: 358, y: 264, width: 20, height: 82, depth: 12 },
+    { kind: "lamp", x: 504, y: 264, width: 20, height: 82, depth: 12 },
     { kind: "tree", x: 224, y: 344, width: 28, height: 40, depth: 14 },
     { kind: "tree", x: 24, y: 220, width: 28, height: 40, depth: 14 },
   ],

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SAVE_KEY, getActiveElapsedMs, getSnapshot, loadSnapshot, patchSnapshot, pauseActiveTimer, resumeActiveTimer, setCheckpoint, startNewGame, unlockTip } from "./store";
+import { SAVE_KEY, discoverLandmark, getActiveElapsedMs, getSnapshot, loadSnapshot, patchSnapshot, pauseActiveTimer, recordNpcChoice, resumeActiveTimer, setCheckpoint, startNewGame, unlockTip } from "./store";
 
 class MemoryStorage implements Storage {
   private values = new Map<string, string>();
@@ -11,7 +11,7 @@ class MemoryStorage implements Storage {
   setItem(key: string, value: string): void { this.values.set(key, value); }
 }
 
-describe("V4 game snapshot", () => {
+describe("V5 game snapshot", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-04T10:00:00Z"));
@@ -80,9 +80,55 @@ describe("V4 game snapshot", () => {
     expect(loadSnapshot()?.unlockedTips).toEqual(["guide-dog-access"]);
   });
 
-  it("filters unknown V4 tips while retaining wheelchair guidance", () => {
+  it("filters unknown tips while retaining wheelchair guidance", () => {
     localStorage.setItem(SAVE_KEY, JSON.stringify({ ...getSnapshot(), unlockedTips: ["wheelchair-pushing", "unknown-tip"] }));
     expect(loadSnapshot()?.unlockedTips).toEqual(["wheelchair-pushing"]);
+  });
+
+  it("persists Plan 2 journey, landmark, route and egg-tart state", () => {
+    patchSnapshot({ openingReply: "careful", routeChoice: "shop-wall", eggTartPurchased: true, eggTartBoostRemainingMs: 42_500, eggTartScentPrompted: true });
+    discoverLandmark("egg-tart-oven");
+    recordNpcChoice("egg-tart-vendor", "buy");
+    expect(loadSnapshot()).toMatchObject({
+      version: 5,
+      openingReply: "careful",
+      routeChoice: "shop-wall",
+      knownLandmarks: ["egg-tart-oven"],
+      eggTartPurchased: true,
+      eggTartBoostRemainingMs: 42_500,
+      eggTartScentPrompted: true,
+      npcChoices: { "egg-tart-vendor": "buy" },
+    });
+  });
+
+  it("migrates a V4 save instead of discarding the journey", () => {
+    localStorage.clear();
+    localStorage.setItem("sound-road-macau-2d:v4", JSON.stringify({ ...getSnapshot(), version: 4, scene: "old-city", objectiveId: "visit-pet-shop" }));
+    expect(loadSnapshot()).toMatchObject({ version: 5, scene: "old-city", objectiveId: "visit-pet-shop", resumeStage: "old-city-street", openingReply: null, eggTartPurchased: false });
+    expect(localStorage.getItem("sound-road-macau-2d:v4")).toBeNull();
+    expect(localStorage.getItem(SAVE_KEY)).not.toBeNull();
+  });
+
+  it("repairs scene stages that disagree with their current objective", () => {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      ...getSnapshot(),
+      scene: "old-city",
+      objectiveId: "visit-pet-shop",
+      resumeStage: "old-city-entry",
+    }));
+    expect(loadSnapshot()).toMatchObject({
+      scene: "old-city",
+      objectiveId: "visit-pet-shop",
+      resumeStage: "old-city-street",
+    });
+
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      ...getSnapshot(),
+      scene: "ruins",
+      objectiveId: "follow-wheelchair",
+      resumeStage: "ruins-entry",
+    }));
+    expect(loadSnapshot()).toMatchObject({ resumeStage: "ruins-procession" });
   });
 
   it("discards outdated saves so the merged old-city starts fresh", () => {
