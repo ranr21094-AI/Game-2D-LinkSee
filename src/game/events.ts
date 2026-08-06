@@ -1,4 +1,5 @@
 import type { EndingId, HudState, SceneId, TipId, TilePoint } from "./types";
+import type { NpcDialogue } from "./npcs";
 
 export type TipSource = "intro" | "sidebar" | "bus-door" | "bell" | "wheelchair" | "pet-shop";
 export type TipEventPayload = { id: TipId; source: TipSource };
@@ -11,10 +12,14 @@ type EventMap = {
   announce: string;
   devTeleport: TilePoint;
   devInteract: undefined;
+  devTap: undefined;
+  devListen: undefined;
   devReveal: "hint";
   chapter: { from: SceneId; to: SceneId };
   tipOpen: TipEventPayload;
   tipClosed: TipEventPayload;
+  npcDialogueOpen: NpcDialogue;
+  npcDialogueChoice: { npcId: string; optionId: string };
 };
 
 type Handler<T> = (payload: T) => void;

@@ -1,14 +1,16 @@
 import Phaser from "phaser";
 import { audioDirector } from "./audio";
-import { BusInteriorScene, BusStopScene, OldCityScene, RuinsScene } from "./scenes";
-import { pauseActiveTimer, resumeActiveTimer } from "./store";
-import type { SceneId } from "./types";
+import { BusInteriorScene, BusRideScene, BusStopScene, OldCityScene, RuinsScene } from "./scenes";
+import { getSnapshot, pauseActiveTimer, resumeActiveTimer } from "./store";
+import type { GameTextState, SceneId } from "./types";
 
 let game: Phaser.Game | null = null;
 let resizeHandler: (() => void) | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let visibilityHandler: (() => void) | null = null;
 let manuallyPaused = false;
+
+type TextRenderableScene = Phaser.Scene & { renderGameToText?: () => GameTextState };
 
 function sceneKey(scene: SceneId): string {
   return scene;
@@ -17,10 +19,11 @@ function sceneKey(scene: SceneId): string {
 export function startGame(parent: string, initialScene: SceneId): Phaser.Game {
   destroyGame();
   manuallyPaused = false;
-  const classes = [BusStopScene, BusInteriorScene, OldCityScene, RuinsScene];
+  const classes = [BusStopScene, BusInteriorScene, BusRideScene, OldCityScene, RuinsScene];
   const classByScene: Record<SceneId, (typeof classes)[number]> = {
     "bus-stop": BusStopScene,
     "bus-interior": BusInteriorScene,
+    "bus-ride": BusRideScene,
     "old-city": OldCityScene,
     ruins: RuinsScene,
   };
@@ -31,7 +34,7 @@ export function startGame(parent: string, initialScene: SceneId): Phaser.Game {
     parent,
     width: 640,
     height: 360,
-    backgroundColor: "#77736b",
+    backgroundColor: getSnapshot().settings.gameMode === "night" ? "#000000" : "#77736b",
     pixelArt: true,
     antialias: false,
     roundPixels: true,
@@ -71,7 +74,63 @@ export function startGame(parent: string, initialScene: SceneId): Phaser.Game {
   document.addEventListener("visibilitychange", visibilityHandler);
   resizeHandler();
   resumeActiveTimer();
+  installGameTestHooks();
   return game;
+}
+
+export function renderGameToText(): string {
+  const active = game?.scene.getScenes(true).find((scene) => typeof (scene as TextRenderableScene).renderGameToText === "function") as TextRenderableScene | undefined;
+  if (active?.renderGameToText) return JSON.stringify(active.renderGameToText());
+  const snapshot = getSnapshotForText();
+  return JSON.stringify({
+    coordinateSystem: "origin top-left; x right; y down; canvas 640x360",
+    mode: snapshot.ending ? "ending" : "menu",
+    gameMode: snapshot.settings.gameMode,
+    scene: snapshot.scene,
+    journeyGoal: "赴约：在大三巴与老友林伯会合",
+    player: null,
+    objective: { id: snapshot.objectiveId, label: snapshot.ending ? "旅程已经完成" : "游戏尚未开始", target: { x: 0, y: 0 } },
+    prompt: "",
+    subtitle: "",
+    contact: "",
+    npcs: [],
+    nearbySoundLandmarks: [],
+    recentEvidence: [],
+    knownLandmarks: snapshot.knownLandmarks,
+    routeChoice: snapshot.routeChoice,
+    openingReply: snapshot.openingReply,
+    movementSurface: "stationary",
+    movementSpeedMultiplier: 1,
+    eggTartPurchased: snapshot.eggTartPurchased,
+    eggTartBoostRemainingMs: snapshot.eggTartBoostRemainingMs,
+    insideEggTartScentZone: false,
+    eggTartScentPrompted: snapshot.eggTartScentPrompted,
+    cooldowns: { hintMs: 0, flashMs: 0, listenMs: 0 },
+    flags: { controlsLocked: false, dialogueOpen: false, listening: false, ending: snapshot.ending },
+  } satisfies GameTextState);
+}
+
+function getSnapshotForText() {
+  return getSnapshot();
+}
+
+export function advanceGameTime(ms: number): void {
+  if (!game || ms <= 0) return;
+  const wasRunning = game.loop.running;
+  game.loop.sleep();
+  const frameMs = 1000 / 60;
+  const steps = Math.max(1, Math.ceil(ms / frameMs));
+  let time = game.loop.now;
+  for (let index = 0; index < steps; index += 1) {
+    time += Math.min(frameMs, ms - index * frameMs || frameMs);
+    game.loop.step(time);
+  }
+  if (wasRunning) game.loop.wake();
+}
+
+export function installGameTestHooks(): void {
+  window.render_game_to_text = renderGameToText;
+  window.advanceTime = advanceGameTime;
 }
 
 export function pauseGame(): void {

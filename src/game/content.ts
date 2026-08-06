@@ -101,6 +101,7 @@ export const ROUTE_BRIEFINGS: Record<"bus-stop" | "bus-interior", string> = {
 export const SCENE_LABELS: Record<SceneId, string> = {
   "bus-stop": "關閘 · 17路候车区",
   "bus-interior": "17路 · 车厢",
+  "bus-ride": "17路 · 前往白鸽巢",
   "old-city": "白鸽巢 · 旧城街市",
   ruins: "大三巴牌坊",
 };
@@ -151,12 +152,20 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
     interaction: "interact",
     checkpoint: true,
   },
+  "ride-to-camoes": {
+    id: "ride-to-camoes",
+    scene: "bus-ride",
+    label: "坐稳，下一站白鸽巢",
+    target: { x: 0, y: 0 },
+    triggerRadius: 0,
+    interaction: "approach",
+  },
   "request-crossing": {
     id: "request-crossing",
     scene: "old-city",
     label: "沿盲道向北到路缘点阵，按 E 请求通行",
     target: { x: 40, y: 124 },
-    triggerRadius: 32,
+    triggerRadius: 34,
     interaction: "interact",
     checkpoint: true,
   },
@@ -165,7 +174,7 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
     scene: "old-city",
     label: "留在路缘，等待可通行提示",
     target: { x: 40, y: 124 },
-    triggerRadius: 32,
+    triggerRadius: 34,
     interaction: "approach",
   },
   "cross-junction": {
@@ -193,12 +202,28 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
     triggerRadius: 30,
     interaction: "approach",
   },
+  "follow-shop-wall": {
+    id: "follow-shop-wall",
+    scene: "old-city",
+    label: "沿店铺墙面前进，听风铃确认街段",
+    target: { x: 392, y: 268 },
+    triggerRadius: 30,
+    interaction: "approach",
+  },
+  "follow-curb-edge": {
+    id: "follow-curb-edge",
+    scene: "old-city",
+    label: "沿路缘慢行，听排水声确认街段",
+    target: { x: 408, y: 284 },
+    triggerRadius: 30,
+    interaction: "approach",
+  },
   "visit-pet-shop": {
     id: "visit-pet-shop",
     scene: "old-city",
     label: "在猫记宠物门前停下，按 E 了解导盲犬的处境",
     target: { x: 536, y: 140 },
-    triggerRadius: 30,
+    triggerRadius: 32,
     interaction: "interact",
   },
   "reach-terminus": {
@@ -214,7 +239,7 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
     scene: "ruins",
     label: "沿路边坡道找到轮椅上的林伯",
     target: { x: 328, y: 268 },
-    triggerRadius: 36,
+    triggerRadius: 38,
     interaction: "interact",
     checkpoint: true,
   },
@@ -228,7 +253,7 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
   },
 };
 
-export const PATHS: Record<Exclude<SceneId, "bus-interior">, TactilePathDefinition> = {
+export const PATHS: Record<Exclude<SceneId, "bus-ride" | "bus-interior">, TactilePathDefinition> = {
   "bus-stop": {
     scene: "bus-stop",
     nodes: [
@@ -276,9 +301,9 @@ export const OLD_CITY_CROSSING: CrossingDefinition = {
 export const TUTORIAL_LINES = [
   "四条凸纹表示继续前进",
   "4×4凸点表示停下探测并改变方向",
-  "Space 敲击单杖 · G照亮四周 · E互动 · Q方向提示 · H重复任务",
+  "Space 敲击单杖 · R驻足聆听 · G照亮四周 · E互动 · Q方向提示 · H重复任务",
 ];
 
-export function composeRepeatText(contact: string, task: string): string {
-  return `最近触觉：${contact}。${task}`;
+export function composeRepeatText(contact: string, task: string, journeyGoal: string): string {
+  return `最近触觉：${contact}。${task}。${journeyGoal}`;
 }

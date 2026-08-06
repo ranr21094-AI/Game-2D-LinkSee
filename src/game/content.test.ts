@@ -77,7 +77,7 @@ describe("tactile path definitions", () => {
   });
 
   it("repeats the latest tactile result together with the current task", () => {
-    expect(composeRepeatText("四条连续凸纹：沿纹路继续", "当前任务：找到扶手")).toBe("最近触觉：四条连续凸纹：沿纹路继续。当前任务：找到扶手");
+    expect(composeRepeatText("四条连续凸纹：沿纹路继续", "当前任务：找到扶手", "赴约：与林伯会合")).toBe("最近触觉：四条连续凸纹：沿纹路继续。当前任务：找到扶手。赴约：与林伯会合");
   });
 
   it("keeps the temporarily disabled F phone assist out of tutorial copy", () => {

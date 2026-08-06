@@ -1,4 +1,4 @@
-import type { BusTransitState, ColorMemoryPoint, CrossingDefinition, CrossingState, EndingId, EndingMetrics, GameSnapshotV4, ResumeStage, TilePoint } from "./types";
+import type { BusTransitState, ColorMemoryPoint, CrossingDefinition, CrossingState, EndingId, EndingMetrics, GameSnapshotV5, ResumeStage, TilePoint } from "./types";
 import type { TipEventPayload } from "./events";
 
 export type BusAction = "openDoor" | "board" | "sit" | "depart" | "arrive" | "alight";
@@ -18,6 +18,26 @@ const BUS_TRANSITIONS: Record<BusTransitState, Partial<Record<BusAction, BusTran
 
 export function transitionBus(state: BusTransitState, action: BusAction): BusTransitState {
   return BUS_TRANSITIONS[state]?.[action] ?? state;
+}
+
+export function busRideCheckpointAfterBell(state: BusTransitState): Pick<GameSnapshotV5, "busState" | "scene" | "objectiveId" | "resumeStage"> {
+  return {
+    busState: transitionBus(state, "depart"),
+    scene: "bus-ride",
+    objectiveId: "ride-to-camoes",
+    resumeStage: "bus-ride",
+  };
+}
+
+export function movementSpeedMultiplier(options: { onRoad: boolean; hasPath: boolean; onGuidedPath: boolean }): number {
+  if (!options.hasPath || options.onGuidedPath) return 1;
+  return 0.35;
+}
+
+export const BASE_WALK_SPEED = 68;
+
+export function effectiveWalkSpeed(terrainMultiplier: number, boostMultiplier = 1): number {
+  return BASE_WALK_SPEED * terrainMultiplier * boostMultiplier;
 }
 
 export function shouldStartWheelchairProcession(tip: TipEventPayload): boolean {
@@ -70,7 +90,7 @@ export function constrainCrossingPosition(state: CrossingState, position: TilePo
 
 export function determineEnding(metrics: EndingMetrics): EndingId {
   if (metrics.returnRequested) return "return";
-  if (metrics.elapsedSeconds > 8 * 60 || metrics.detourScore >= 5) return "detour";
+  if (metrics.detourScore >= 5) return "detour";
   return "reunion";
 }
 
@@ -84,12 +104,13 @@ export function mergeColorMemory(points: ColorMemoryPoint[], next: ColorMemoryPo
   return merged.length > COLOR_MEMORY_LIMIT ? merged.slice(merged.length - COLOR_MEMORY_LIMIT) : merged;
 }
 
-const CHECKPOINTS: Record<ResumeStage, Pick<GameSnapshotV4, "scene" | "objectiveId" | "resumeStage"> & { point: TilePoint }> = {
+const CHECKPOINTS: Record<ResumeStage, Pick<GameSnapshotV5, "scene" | "objectiveId" | "resumeStage"> & { point: TilePoint }> = {
   "bus-stop-entry": { scene: "bus-stop", objectiveId: "find-stop-sign", resumeStage: "bus-stop-entry", point: { x: 88, y: 268 } },
   "bus-stop-sign": { scene: "bus-stop", objectiveId: "board-17", resumeStage: "bus-stop-sign", point: { x: 232, y: 204 } },
   "bus-interior-entry": { scene: "bus-interior", objectiveId: "find-card-reader", resumeStage: "bus-interior-entry", point: { x: 536, y: 76 } },
   "bus-interior-seat": { scene: "bus-interior", objectiveId: "find-seat", resumeStage: "bus-interior-seat", point: { x: 392, y: 148 } },
   "bus-interior-bell": { scene: "bus-interior", objectiveId: "ring-bell", resumeStage: "bus-interior-bell", point: { x: 392, y: 148 } },
+  "bus-ride": { scene: "bus-ride", objectiveId: "ride-to-camoes", resumeStage: "bus-ride", point: { x: 320, y: 180 } },
   "old-city-entry": { scene: "old-city", objectiveId: "request-crossing", resumeStage: "old-city-entry", point: { x: 40, y: 284 } },
   "old-city-wait": { scene: "old-city", objectiveId: "wait-crossing", resumeStage: "old-city-wait", point: { x: 40, y: 124 } },
   "old-city-go": { scene: "old-city", objectiveId: "cross-junction", resumeStage: "old-city-go", point: { x: 40, y: 124 } },
@@ -111,7 +132,7 @@ export function isBusState(state: unknown): state is BusTransitState {
   return typeof state === "string" && (BUS_STATES as Set<string>).has(state);
 }
 
-export function checkpointForStage(stage: ResumeStage): Pick<GameSnapshotV4, "scene" | "objectiveId" | "resumeStage"> {
+export function checkpointForStage(stage: ResumeStage): Pick<GameSnapshotV5, "scene" | "objectiveId" | "resumeStage"> {
   // Degrade a bad stage to the very first checkpoint instead of throwing.
   const { point: _point, ...checkpoint } = CHECKPOINTS[stage] ?? CHECKPOINTS["bus-stop-entry"];
   return checkpoint;
