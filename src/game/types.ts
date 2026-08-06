@@ -1,4 +1,4 @@
-export type SceneId = "bus-stop" | "bus-interior" | "bus-ride" | "old-city" | "ruins";
+export type SceneId = "bus-stop" | "bus-interior" | "old-city" | "ruins";
 
 export type TilePoint = { x: number; y: number };
 
@@ -95,7 +95,6 @@ export type ResumeStage =
   | "bus-interior-entry"
   | "bus-interior-seat"
   | "bus-interior-bell"
-  | "bus-ride"
   | "old-city-entry"
   | "old-city-wait"
   | "old-city-go"

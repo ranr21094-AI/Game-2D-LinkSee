@@ -99,7 +99,6 @@ export const ROUTE_BRIEFINGS: Record<"bus-stop" | "bus-interior", string> = {
 export const SCENE_LABELS: Record<SceneId, string> = {
   "bus-stop": "關閘 · 17路候车区",
   "bus-interior": "17路 · 车厢",
-  "bus-ride": "17路 · 前往白鸽巢",
   "old-city": "白鸽巢 · 旧城街市",
   ruins: "大三巴牌坊",
 };
@@ -149,14 +148,6 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
     triggerRadius: 30,
     interaction: "interact",
     checkpoint: true,
-  },
-  "ride-to-camoes": {
-    id: "ride-to-camoes",
-    scene: "bus-ride",
-    label: "坐稳，下一站白鸽巢",
-    target: { x: 0, y: 0 },
-    triggerRadius: 0,
-    interaction: "approach",
   },
   "request-crossing": {
     id: "request-crossing",
@@ -235,7 +226,7 @@ export const OBJECTIVES: Record<string, ObjectiveStep2D> = {
   },
 };
 
-export const PATHS: Record<Exclude<SceneId, "bus-ride" | "bus-interior">, TactilePathDefinition> = {
+export const PATHS: Record<Exclude<SceneId, "bus-interior">, TactilePathDefinition> = {
   "bus-stop": {
     scene: "bus-stop",
     nodes: [

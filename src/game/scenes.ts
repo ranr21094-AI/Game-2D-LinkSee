@@ -1,5 +1,4 @@
 import Phaser from "phaser";
-import busWindowPanoramaUrl from "../assets/bus-window-panorama-pixel.png";
 import travelerWalkUrl from "../assets/traveler-walk.png";
 import travelerSitUrl from "../assets/traveler-sit.png";
 import travelerSitUpUrl from "../assets/traveler-sit-up.png";
@@ -23,7 +22,7 @@ import { collectMemory, finishGame, getActiveElapsedMs, getSnapshot, patchSnapsh
 import { ensureTactileTextures, TACTILE_TEXTURE } from "./tactile-layer";
 import { describeDecisionBrick, rasterizeTactilePath, type TactileBrick } from "./tactile-tiles";
 import { isWalkable, movementUnderPoint, nearestSafeWalkablePoint, solidDecorationAt, tileUnderPoint, type MapDecoration, type TileMapDefinition } from "./tilemap";
-import type { BusTransitState, CaneSurfaceKind, ColorMemoryPoint, CrossingState, HudState, SceneId, TactilePathDefinition, TactilePathNode, TilePoint } from "./types";
+import type { CaneSurfaceKind, ColorMemoryPoint, CrossingState, HudState, SceneId, TactilePathDefinition, TactilePathNode, TilePoint } from "./types";
 
 type Facing = "up" | "down" | "left" | "right";
 type RevealMode = "tap" | "hint" | null;
@@ -74,7 +73,7 @@ function solidSurfaceLabel(kind: MapDecoration["kind"]): string {
 }
 
 abstract class WalkScene extends Phaser.Scene {
-  protected abstract sceneId: Exclude<SceneId, "bus-ride">;
+  protected abstract sceneId: SceneId;
   protected abstract spawn: Phaser.Math.Vector2;
   protected abstract objectiveId: string;
   protected player!: Phaser.GameObjects.Sprite;
@@ -1262,118 +1261,6 @@ export class BusInteriorScene extends WalkScene {
     // The React tip layer resumes the paused scene immediately after emitting
     // tipClosed. Let that resume finish before starting the next Phaser scene.
     this.time.delayedCall(1, () => this.scene.start("old-city"));
-  }
-}
-
-export class BusRideScene extends Phaser.Scene {
-  private startedAt = 0;
-  private ended = false;
-  private keys!: { skip: Phaser.Input.Keyboard.Key; pause: Phaser.Input.Keyboard.Key };
-  private panorama!: Phaser.GameObjects.TileSprite;
-  private scrollAccumulator = 0;
-  private shakeAccumulator = 0;
-  private shakeOffset = 0;
-
-  constructor() {
-    super("bus-ride");
-  }
-
-  preload(): void {
-    if (!this.textures.exists("bus-window-panorama")) this.load.image("bus-window-panorama", busWindowPanoramaUrl);
-  }
-
-  create(): void {
-    ensureGroundTextures(this);
-    BUS_INTERIOR_TILEMAP.groundRows.forEach((row, rowIndex) => [...row].forEach((char, colIndex) => {
-      const key = BUS_INTERIOR_TILEMAP.legend[char] ?? "bus-floor";
-      const variant = deterministicTileVariant("bus-ride", colIndex, rowIndex, key);
-      this.add.image(colIndex * 16 + 8, rowIndex * 16 + 12, GROUND_TEXTURE[key].base[variant]);
-    }));
-    this.panorama = this.add.tileSprite(320, 82, 620, 96, "bus-window-panorama").setDepth(80);
-    const windowFrame = this.add.graphics().setDepth(82);
-    windowFrame.fillStyle(0x302d29, 1);
-    windowFrame.fillRect(4, 28, 632, 8);
-    windowFrame.fillRect(4, 130, 632, 8);
-    windowFrame.fillRect(4, 28, 8, 110);
-    windowFrame.fillRect(628, 28, 8, 110);
-    [160, 320, 480].forEach((x) => windowFrame.fillRect(x - 3, 34, 6, 96));
-    windowFrame.fillStyle(0x8d887e, 0.9);
-    windowFrame.fillRect(12, 36, 616, 2);
-    [132, 252, 388, 508].forEach((x) => renderMapDecoration(this, { kind: "bus-pole", x, y: 356, width: 10, height: 220, depth: 200 }));
-    this.add.rectangle(320, 180, 640, 360, 0x6b6257, 0.06).setDepth(300);
-    const state = getSnapshot().busState === "seated" ? transitionBus("seated", "depart") : "riding";
-    patchSnapshot({ busState: state as BusTransitState, scene: "bus-ride", objectiveId: "ride-to-camoes" });
-    this.keys = {
-      skip: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E),
-      pause: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC),
-    };
-    this.startedAt = this.time.now;
-    gameEvents.emit("scene", "bus-ride");
-    audioDirector.enterScene("bus-ride");
-    gameEvents.emit("hud", {
-      objective: "坐稳，下一站白鸽巢",
-      subtitle: "引擎低鸣，雨珠在车窗上缓缓后退。",
-      prompt: "3秒后可按 E 跳过过场",
-      memories: getSnapshot().memories.length,
-      detours: getSnapshot().detourScore,
-      sceneLabel: SCENE_LABELS["bus-ride"],
-      hintCooling: false,
-      contact: "车厢行驶中",
-    });
-    this.time.delayedCall(5200, () => this.say("车内报站：下一站，白鸽巢總站。"));
-    this.time.delayedCall(10500, () => {
-      collectMemory("bus-rain");
-      this.say("记忆回声：林伯曾说，听见雨落在玻璃上，就知道离家不远了。");
-    });
-    this.time.delayedCall(16400, () => this.say("17路驶入旧城，车速慢了下来。"));
-    this.time.delayedCall(21000, () => this.finishRide());
-  }
-
-  update(_time: number, delta: number): void {
-    if (!getSnapshot().settings.reducedMotion) {
-      this.scrollAccumulator += delta;
-      while (this.scrollAccumulator >= 120) {
-        this.scrollAccumulator -= 120;
-        this.panorama.tilePositionX = Math.round(this.panorama.tilePositionX + 2);
-      }
-      this.shakeAccumulator += delta;
-      if (this.shakeAccumulator >= 240) {
-        this.shakeAccumulator %= 240;
-        this.shakeOffset = this.shakeOffset ? 0 : 1;
-        this.cameras.main.setScroll(0, this.shakeOffset);
-      }
-    } else if (this.cameras.main.scrollY !== 0) {
-      this.cameras.main.setScroll(0, 0);
-    }
-    if (Phaser.Input.Keyboard.JustDown(this.keys.pause)) {
-      this.scene.pause();
-      gameEvents.emit("pause", true);
-    }
-    if (this.time.now - this.startedAt > 3000 && Phaser.Input.Keyboard.JustDown(this.keys.skip)) this.finishRide();
-  }
-
-  private say(text: string): void {
-    gameEvents.emit("hud", {
-      objective: "坐稳，下一站白鸽巢",
-      subtitle: text,
-      prompt: "E  跳过过场",
-      memories: getSnapshot().memories.length,
-      detours: getSnapshot().detourScore,
-      sceneLabel: SCENE_LABELS["bus-ride"],
-      hintCooling: false,
-      contact: "车厢行驶中",
-    });
-  }
-
-  private finishRide(): void {
-    if (this.ended) return;
-    this.ended = true;
-    // Skipping the ride before the 10.5s narration must not cost the memory.
-    collectMemory("bus-rain");
-    const arrived = transitionBus(getSnapshot().busState, "arrive");
-    patchSnapshot({ busState: arrived, scene: "old-city", objectiveId: "request-crossing", resumeStage: "old-city-entry" });
-    gameEvents.emit("chapter", { from: "bus-ride", to: "old-city" });
-    this.scene.start("old-city");
   }
 }
 

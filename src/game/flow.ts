@@ -17,7 +17,7 @@ const BUS_TRANSITIONS: Record<BusTransitState, Partial<Record<BusAction, BusTran
 };
 
 export function transitionBus(state: BusTransitState, action: BusAction): BusTransitState {
-  return BUS_TRANSITIONS[state][action] ?? state;
+  return BUS_TRANSITIONS[state]?.[action] ?? state;
 }
 
 export function shouldStartWheelchairProcession(tip: TipEventPayload): boolean {
@@ -34,7 +34,7 @@ const CROSSING_TRANSITIONS: Record<CrossingState, Partial<Record<CrossingAction,
 };
 
 export function transitionCrossing(state: CrossingState, action: CrossingAction): CrossingState {
-  return CROSSING_TRANSITIONS[state][action] ?? state;
+  return CROSSING_TRANSITIONS[state]?.[action] ?? state;
 }
 
 export function constrainCrossingPosition(state: CrossingState, position: TilePoint, definition: CrossingDefinition): TilePoint {
@@ -90,7 +90,6 @@ const CHECKPOINTS: Record<ResumeStage, Pick<GameSnapshotV4, "scene" | "objective
   "bus-interior-entry": { scene: "bus-interior", objectiveId: "find-card-reader", resumeStage: "bus-interior-entry", point: { x: 536, y: 76 } },
   "bus-interior-seat": { scene: "bus-interior", objectiveId: "find-seat", resumeStage: "bus-interior-seat", point: { x: 392, y: 148 } },
   "bus-interior-bell": { scene: "bus-interior", objectiveId: "ring-bell", resumeStage: "bus-interior-bell", point: { x: 392, y: 148 } },
-  "bus-ride": { scene: "bus-ride", objectiveId: "ride-to-camoes", resumeStage: "bus-ride", point: { x: 320, y: 180 } },
   "old-city-entry": { scene: "old-city", objectiveId: "request-crossing", resumeStage: "old-city-entry", point: { x: 40, y: 284 } },
   "old-city-wait": { scene: "old-city", objectiveId: "wait-crossing", resumeStage: "old-city-wait", point: { x: 40, y: 124 } },
   "old-city-go": { scene: "old-city", objectiveId: "cross-junction", resumeStage: "old-city-go", point: { x: 40, y: 124 } },
@@ -99,11 +98,26 @@ const CHECKPOINTS: Record<ResumeStage, Pick<GameSnapshotV4, "scene" | "objective
   "ruins-procession": { scene: "ruins", objectiveId: "follow-wheelchair", resumeStage: "ruins-procession", point: { x: 328, y: 316 } },
 };
 
+/** Runtime guards for untrusted persisted data; a save with an unknown
+ *  stage/state is rejected at load instead of crashing on a missing key. */
+const STAGES = new Set<ResumeStage>(Object.keys(CHECKPOINTS) as ResumeStage[]);
+const BUS_STATES = new Set<BusTransitState>(Object.keys(BUS_TRANSITIONS) as BusTransitState[]);
+
+export function isKnownStage(stage: unknown): stage is ResumeStage {
+  return typeof stage === "string" && (STAGES as Set<string>).has(stage);
+}
+
+export function isBusState(state: unknown): state is BusTransitState {
+  return typeof state === "string" && (BUS_STATES as Set<string>).has(state);
+}
+
 export function checkpointForStage(stage: ResumeStage): Pick<GameSnapshotV4, "scene" | "objectiveId" | "resumeStage"> {
-  const { point: _point, ...checkpoint } = CHECKPOINTS[stage];
+  // Degrade a bad stage to the very first checkpoint instead of throwing.
+  const { point: _point, ...checkpoint } = CHECKPOINTS[stage] ?? CHECKPOINTS["bus-stop-entry"];
   return checkpoint;
 }
 
 export function resumePointForStage(stage: ResumeStage): TilePoint {
-  return { ...CHECKPOINTS[stage].point };
+  const { point } = CHECKPOINTS[stage] ?? CHECKPOINTS["bus-stop-entry"];
+  return { ...point };
 }

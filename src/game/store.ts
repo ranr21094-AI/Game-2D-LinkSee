@@ -1,5 +1,6 @@
+import { OBJECTIVES } from "./content";
+import { checkpointForStage, isBusState, isKnownStage } from "./flow";
 import type { EndingId, GameSnapshotV4, MemoryId, ResumeStage, TipId } from "./types";
-import { checkpointForStage } from "./flow";
 
 export const SAVE_KEY = "sound-road-macau-2d:v4";
 const OUTDATED_SAVE_KEYS = ["sound-road-macau-2d:v3", "sound-road-macau-2d:v2"];
@@ -51,13 +52,15 @@ function flushActiveElapsed(): void {
 
 function normalizeBusInteriorResume(next: GameSnapshotV4): GameSnapshotV4 {
   if (next.scene !== "bus-interior") return next;
-  if (next.objectiveId === "ride-to-camoes" || next.objectiveId === "ring-bell" || ["seated", "riding", "arrived"].includes(next.busState)) {
-    return { ...next, objectiveId: "ring-bell", resumeStage: "bus-interior-bell" };
+  // Coerce busState to what the flow gates expect, so a corrupt save
+  // (e.g. busState "waiting") cannot soft-lock the card→seat→bell chain.
+  if (next.objectiveId === "ring-bell" || ["seated", "riding", "arrived"].includes(next.busState)) {
+    return { ...next, objectiveId: "ring-bell", resumeStage: "bus-interior-bell", busState: "seated" };
   }
   if (next.objectiveId === "find-seat" || next.resumeStage === "bus-interior-seat") {
-    return { ...next, objectiveId: "find-seat", resumeStage: "bus-interior-seat" };
+    return { ...next, objectiveId: "find-seat", resumeStage: "bus-interior-seat", busState: "boarding" };
   }
-  return { ...next, objectiveId: "find-card-reader", resumeStage: "bus-interior-entry" };
+  return { ...next, objectiveId: "find-card-reader", resumeStage: "bus-interior-entry", busState: "boarding" };
 }
 
 export function loadSnapshot(): GameSnapshotV4 | null {
@@ -68,6 +71,11 @@ export function loadSnapshot(): GameSnapshotV4 | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<GameSnapshotV4>;
     if (parsed.version !== 4 || typeof parsed.scene !== "string" || !parsed.settings) return null;
+    // Reject unknown enum values so a tampered/old-format save degrades to a
+    // fresh start instead of crashing on a missing CHECKPOINTS/BUS_TRANSITIONS key.
+    if (parsed.resumeStage !== undefined && !isKnownStage(parsed.resumeStage)) return null;
+    if (parsed.busState !== undefined && !isBusState(parsed.busState)) return null;
+    if (parsed.objectiveId !== undefined && !OBJECTIVES[parsed.objectiveId]) return null;
     snapshot = normalizeBusInteriorResume({
       ...createInitialSnapshot(),
       ...parsed,

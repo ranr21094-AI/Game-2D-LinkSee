@@ -276,7 +276,6 @@ export function App() {
                 <button onClick={() => jumpDev("bus-interior-entry", "boarding")}>车厢</button>
                 <button onClick={teleportToCurrentTarget}>到目标</button>
                 <button onClick={() => gameEvents.emit("devInteract", undefined)}>执行E</button>
-                <button onClick={() => jumpDev("bus-ride", "seated")}>过场</button>
                 <button onClick={() => jumpDev("old-city-entry", "arrived")}>旧城</button>
                 <button onClick={() => jumpDev("old-city-street", "alighted")}>商街</button>
                 <button onClick={() => jumpDev("ruins-entry", "alighted")}>终点</button>

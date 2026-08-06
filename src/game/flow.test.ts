@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { OLD_CITY_CROSSING } from "./content";
-import { BELL_WINDOW_MS, checkpointForStage, COLOR_MEMORY_LIMIT, constrainCrossingPosition, determineEnding, mergeColorMemory, resumePointForStage, shouldStartWheelchairProcession, transitionBus, transitionCrossing } from "./flow";
+import { BELL_WINDOW_MS, checkpointForStage, COLOR_MEMORY_LIMIT, constrainCrossingPosition, determineEnding, isBusState, isKnownStage, mergeColorMemory, resumePointForStage, shouldStartWheelchairProcession, transitionBus, transitionCrossing } from "./flow";
 import { RUINS_DAUGHTER_END, RUINS_DAUGHTER_START, RUINS_LAM_END, RUINS_LAM_START, RUINS_PLAYER_END, RUINS_PLAYER_START, RUINS_PROCESSION_DURATION_MS, ruinsProcessionPositions } from "./ruins-map";
+import type { ResumeStage } from "./types";
 
 describe("bus state machine", () => {
   it("keeps the free-exploration bus checkpoints explicit", () => {
@@ -33,6 +34,23 @@ describe("bus state machine", () => {
 
   it("rejects invalid jumps", () => {
     expect(transitionBus("waiting", "sit")).toBe("waiting");
+  });
+});
+
+describe("save-data guards", () => {
+  it("recognizes real stages and bus states but rejects junk", () => {
+    expect(isKnownStage("bus-interior-bell")).toBe(true);
+    expect(isKnownStage("bus-stop-entry")).toBe(true);
+    expect(isKnownStage("bogus")).toBe(false);
+    expect(isKnownStage(42)).toBe(false);
+    expect(isBusState("seated")).toBe(true);
+    expect(isBusState("waiting")).toBe(true);
+    expect(isBusState("bogus")).toBe(false);
+  });
+
+  it("degrades an unknown resume stage to the first checkpoint instead of crashing", () => {
+    expect(resumePointForStage("bogus" as ResumeStage)).toEqual({ x: 88, y: 268 });
+    expect(checkpointForStage("bogus" as ResumeStage)).toEqual({ scene: "bus-stop", objectiveId: "find-stop-sign", resumeStage: "bus-stop-entry" });
   });
 });
 

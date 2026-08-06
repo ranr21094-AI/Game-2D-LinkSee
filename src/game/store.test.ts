@@ -96,4 +96,28 @@ describe("V4 game snapshot", () => {
     localStorage.setItem(SAVE_KEY, JSON.stringify({ ...getSnapshot(), version: 3 }));
     expect(loadSnapshot()).toBeNull();
   });
+
+  it("rejects a save with an unknown resumeStage instead of crashing", () => {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ ...getSnapshot(), resumeStage: "bogus-stage" }));
+    expect(loadSnapshot()).toBeNull();
+  });
+
+  it("rejects a save with an unknown busState instead of crashing", () => {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ ...getSnapshot(), busState: "bogus-state" }));
+    expect(loadSnapshot()).toBeNull();
+  });
+
+  it("rejects a save with an unknown objectiveId", () => {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ ...getSnapshot(), objectiveId: "bogus-objective" }));
+    expect(loadSnapshot()).toBeNull();
+  });
+
+  it("normalizes a bus-interior save so the card→seat→bell flow cannot soft-lock", () => {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ ...getSnapshot(), scene: "bus-interior", busState: "waiting", objectiveId: "find-card-reader", resumeStage: "bus-interior-entry" }));
+    expect(loadSnapshot()).toMatchObject({ scene: "bus-interior", busState: "boarding", objectiveId: "find-card-reader", resumeStage: "bus-interior-entry" });
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ ...getSnapshot(), scene: "bus-interior", busState: "waiting", objectiveId: "find-seat", resumeStage: "bus-interior-seat" }));
+    expect(loadSnapshot()).toMatchObject({ scene: "bus-interior", busState: "boarding", objectiveId: "find-seat", resumeStage: "bus-interior-seat" });
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ ...getSnapshot(), scene: "bus-interior", busState: "waiting", objectiveId: "ring-bell", resumeStage: "bus-interior-bell" }));
+    expect(loadSnapshot()).toMatchObject({ scene: "bus-interior", busState: "seated", objectiveId: "ring-bell", resumeStage: "bus-interior-bell" });
+  });
 });
