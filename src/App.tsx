@@ -5,12 +5,16 @@ import { destroyGame, installGameTestHooks, pauseGame, resumeGame, startGame } f
 import { EGG_TART_STALL } from "./game/egg-tart";
 import { gameEvents, type TipSource } from "./game/events";
 import { checkpointForStage } from "./game/flow";
-import { endingChoiceCopy, JOURNEY_GOAL, LANDMARK_NOTES, OPENING_REPLIES, openingReplyEcho } from "./game/journey";
+import { endingChoiceCopy, JOURNEY_GOAL, MEMORY_DEFINITIONS, OPENING_REPLIES, openingReplyEcho } from "./game/journey";
 import type { NpcDialogue } from "./game/npcs";
 import { finishGame, getSnapshot, loadSnapshot, patchSnapshot, startNewGame } from "./game/store";
 import type { EndingId, GameSettings, GameSnapshotV5, HudState, TipId } from "./game/types";
 import type { BusTransitState, ResumeStage, SceneId } from "./game/types";
 import chapterMapUrl from "./assets/chapter-map-pixel-v2.png";
+import oldPhotoUrl from "./assets/old-photo-pixel.png";
+
+const MEMORY_TOTAL = Object.keys(MEMORY_DEFINITIONS).length;
+const TIP_TOTAL = Object.keys(TIP_DEFINITIONS).length;
 
 const EMPTY_HUD: HudState = {
   journeyGoal: "赴约：在大三巴与老友林伯会合",
@@ -24,7 +28,6 @@ const EMPTY_HUD: HudState = {
   flashCooling: false,
   listenCooling: false,
   listening: false,
-  knownLandmarks: [],
   routeChoice: null,
   eggTartBoostRemainingMs: 0,
   contact: "尚未触碰到物体",
@@ -219,7 +222,7 @@ export function App() {
     setSaved(startNewGame());
     setOpeningChoiceMade(false);
     setScreen("opening");
-    window.setTimeout(() => audioDirector.speak(`林伯的语音留言。${LIN_VOICE_MESSAGE}`), 120);
+    window.setTimeout(() => audioDirector.playVoicemail(), 120);
   };
 
   const chooseOpeningReply = (reply: GameSnapshotV5["openingReply"]) => {
@@ -368,7 +371,7 @@ export function App() {
             <p className="mode-note">{getSnapshot().settings.gameMode === "night" ? "黑夜模式：未触碰处归于全黑，Q 仍提供方向与语音提示。" : "体验模式：触碰后的街景会留下淡彩记忆，适合首次旅程。"}</p>
             <div className="title-actions">
               <button className="primary-button" onClick={beginNew}>开始新旅程</button>
-              {saved && !saved.ending && <button className="secondary-button" onClick={continueSaved}>继续：{saved.scene === "bus-stop" ? "關閘" : saved.scene === "old-city" ? "白鸽巢" : saved.scene === "bus-ride" ? "17路途中" : "上次检查点"}</button>}
+              {saved && !saved.ending && <button className="secondary-button" onClick={continueSaved}>继续：{saved.scene === "bus-stop" ? "關閘" : saved.scene === "old-city" ? "白鸽巢" : "上次检查点"}</button>}
             </div>
             <p className="disclaimer">桌面键盘游戏 · 建议开启声音体验盲杖与环境反馈</p>
             <p className="access-note">当前版本未经视障人士实测，不代表真实失明体验或无障碍认证。</p>
@@ -380,16 +383,13 @@ export function App() {
         <section className="opening-screen" aria-labelledby="opening-title">
           <div className="opening-card pixel-panel">
             <div className="old-photo" role="img" aria-label="一张雨后大三巴前的旧合照：年轻时的你与林伯并肩站在牌坊下">
-              <span className="photo-ruins" aria-hidden="true" />
-              <span className="photo-person photo-person-one" aria-hidden="true" />
-              <span className="photo-person photo-person-two" aria-hidden="true" />
+              <img className="photo-img" src={oldPhotoUrl} alt="" aria-hidden="true" />
               <small>大三巴 · 多年前</small>
             </div>
             <div className="opening-copy">
               <p className="eyebrow">一条未读语音 · 林伯</p>
               <h2 id="opening-title">今天，要去见一位老朋友</h2>
               <p className="voice-message">“{LIN_VOICE_MESSAGE}”</p>
-              <button className="voice-replay" onClick={() => audioDirector.speak(LIN_VOICE_MESSAGE)}>重听语音</button>
               <div className="journey-contract" aria-label="本次旅程目标">
                 <span>旅程目标</span>
                 <strong>{JOURNEY_GOAL}</strong>
@@ -450,8 +450,7 @@ export function App() {
               <small>{hud.sceneLabel}</small>
             </div>
             <div className="hud-memory pixel-panel" aria-label="旅程状态">
-              <span>记忆 {String(hud.memories).padStart(2, "0")}</span>
-              <span>声音地标 {String(hud.knownLandmarks.length).padStart(2, "0")}</span>
+              <span>记忆 {hud.memories} / {MEMORY_TOTAL}</span>
               <span>危险纠偏 {String(hud.detours).padStart(2, "0")}</span>
             </div>
             {hud.eggTartBoostRemainingMs > 0 && (
@@ -463,7 +462,7 @@ export function App() {
             )}
             <button className="tips-entry" onClick={() => { pauseGame(); setShowTipsList(true); }} aria-label={`盲人小贴士，已解锁${getSnapshot().unlockedTips.length}条`}>
               <span className="tips-entry-icon" aria-hidden="true">✦</span>
-              <span><strong>盲人小贴士</strong><small>已解锁 {getSnapshot().unlockedTips.length} 条</small></span>
+              <span><strong>盲人小贴士</strong><small>已解锁 {getSnapshot().unlockedTips.length} / {TIP_TOTAL} 条</small></span>
             </button>
             <div className="hud-contact pixel-panel" aria-live="polite">
               <span className="hud-label">最近触觉 · 一根盲杖</span>
@@ -545,15 +544,15 @@ export function App() {
             <p className="eyebrow">旅程暂停</p>
             <h2 id="pause-title">在雨声里停一会儿</h2>
             <button ref={pausePrimaryRef} className="primary-button" onClick={resume}>继续行走</button>
-            <section className="route-notes" aria-labelledby="route-notes-title">
+            <section className="route-notes" aria-labelledby="memory-list-title">
               <div>
-                <span className="hud-label">路线笔记</span>
-                <h3 id="route-notes-title">声音与触觉地标</h3>
+                <span className="hud-label">记忆清单</span>
+                <h3 id="memory-list-title">一路上亮起的往事</h3>
               </div>
               <p><strong>旧城走法：</strong>{routeChoiceLabel(getSnapshot().routeChoice)}。笔记只保存线索，不画自动导航路线。</p>
-              {getSnapshot().knownLandmarks.length ? (
-                <ol>{getSnapshot().knownLandmarks.map((id) => <li key={id}>{LANDMARK_NOTES[id]}</li>)}</ol>
-              ) : <p className="route-notes-empty">按 R 驻足聆听，确认过的声音会记录在这里。</p>}
+              {getSnapshot().memories.length ? (
+                <ol>{getSnapshot().memories.map((id) => <li key={id}><strong>{MEMORY_DEFINITIONS[id]?.title}</strong>：{MEMORY_DEFINITIONS[id]?.description}</li>)}</ol>
+              ) : <p className="route-notes-empty">还没有想起往事。途中触碰与聆听，会让它们亮起来。</p>}
             </section>
             <label className="setting-row">主音量
               <input type="range" min="0" max="1" step="0.05" value={getSnapshot().settings.masterVolume} onChange={(event) => updateSetting("masterVolume", Number(event.target.value))} />
@@ -636,8 +635,7 @@ export function App() {
             <p>{endingCopy.body}</p>
             <blockquote>{endingCopy.quote}</blockquote>
             <dl className="ending-metrics">
-              <div><dt>记忆</dt><dd>{getSnapshot().memories.length} / 3</dd></div>
-              <div><dt>声音地标</dt><dd>{getSnapshot().knownLandmarks.length}</dd></div>
+              <div><dt>记忆</dt><dd>{getSnapshot().memories.length} / {MEMORY_TOTAL}</dd></div>
               <div><dt>危险纠偏</dt><dd>{getSnapshot().detourScore}</dd></div>
               <div><dt>旧城走法</dt><dd>{routeChoiceLabel(getSnapshot().routeChoice)}</dd></div>
             </dl>

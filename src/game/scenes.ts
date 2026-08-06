@@ -1,5 +1,4 @@
 import Phaser from "phaser";
-import busWindowPanoramaUrl from "../assets/bus-window-panorama-pixel.png";
 import travelerWalkUrl from "../assets/traveler-walk.png";
 import travelerSitUrl from "../assets/traveler-sit.png";
 import travelerSitUpUrl from "../assets/traveler-sit-up.png";
@@ -13,7 +12,7 @@ import { composeRepeatText, OBJECTIVES, OLD_CITY_CROSSING, PATHS, REVEAL_PROFILE
 import { EGG_TART_BOOST_MS, EGG_TART_STALL, eggTartBoostFactor, isInsideEggTartScentZone } from "./egg-tart";
 import { ensureCaneTextures, ensureEggTartVendorTextures, preloadEnvironmentAssets, renderBusBellDecoration, renderMapDecoration, type EnvironmentSprite } from "./environment-art";
 import { gameEvents } from "./events";
-import { BELL_ANNOUNCEMENT_DELAY_MS, busRideCheckpointAfterBell, constrainCrossingPosition, determineEnding, effectiveWalkSpeed, mergeColorMemory, movementSpeedMultiplier, resumePointForStage, shouldStartWheelchairProcession, transitionBus, transitionCrossing } from "./flow";
+import { BELL_ANNOUNCEMENT_DELAY_MS, constrainCrossingPosition, determineEnding, effectiveWalkSpeed, mergeColorMemory, movementSpeedMultiplier, oldCityCheckpointAfterBell, resumePointForStage, shouldStartWheelchairProcession, transitionBus, transitionCrossing } from "./flow";
 import { deterministicTileVariant, ensureGroundTextures, GROUND_TEXTURE, type GroundTileKey, type GroundVisualState } from "./ground-tiles";
 import { BUS_BELL_DETECTION_RADIUS, BUS_CARD_READER, BUS_DRIVER_SEAT, BUS_INTERIOR_DOOR, BUS_INTERIOR_TILEMAP, BUS_SEATED_SPRITE_KEYS, BUS_SEAT_SPOTS, isBusBellInRange, pickBusBellSpot, type BusBellSpot, type BusSeatSpot } from "./businterior-map";
 import { BUS_STOP_DECOY_SIGNS, BUS_STOP_DOOR, BUS_STOP_GATE_ENTRY, BUS_STOP_PATH_START, BUS_STOP_SIGN, BUS_STOP_SIGN_PROBE_RADIUS, BUS_STOP_TILEMAP } from "./busstop-map";
@@ -22,11 +21,11 @@ import { NPC_DEFINITIONS, type NpcDefinition, type NpcDialogue } from "./npcs";
 import { RUINS_DAUGHTER_END, RUINS_DAUGHTER_START, RUINS_LAM_END, RUINS_LAM_START, RUINS_PLAYER_END, RUINS_PLAYER_START, RUINS_PROCESSION_DURATION_MS, RUINS_TILEMAP, ruinsProcessionPositions } from "./ruins-map";
 import { JOURNEY_GOAL } from "./journey";
 import { listeningReport, nearbySoundLandmarks, type SoundLandmark } from "./sound-landmarks";
-import { collectMemory, discoverLandmark, finishGame, getActiveElapsedMs, getSnapshot, patchSnapshot, recordNpcChoice, setCheckpoint, unlockTip } from "./store";
+import { collectMemory, finishGame, getActiveElapsedMs, getSnapshot, patchSnapshot, recordNpcChoice, setCheckpoint, unlockTip } from "./store";
 import { ensureTactileTextures, TACTILE_TEXTURE } from "./tactile-layer";
 import { describeDecisionBrick, rasterizeTactilePath, type TactileBrick } from "./tactile-tiles";
 import { isWalkable, movementUnderPoint, nearestSafeWalkablePoint, solidDecorationAt, tileUnderPoint, type MapDecoration, type TileMapDefinition } from "./tilemap";
-import type { BusRideLandmarkId, BusTransitState, CaneSurfaceKind, ColorMemoryPoint, CrossingState, GameTextState, HudState, KnownLandmarkId, RouteChoice, SceneId, TactilePathDefinition, TactilePathNode, TilePoint } from "./types";
+import type { BusTransitState, CaneSurfaceKind, ColorMemoryPoint, CrossingState, GameTextState, HudState, RouteChoice, SceneId, TactilePathDefinition, TactilePathNode, TilePoint } from "./types";
 
 type Facing = "up" | "down" | "left" | "right";
 type RevealMode = "tap" | "hint" | null;
@@ -777,7 +776,6 @@ abstract class WalkScene extends Phaser.Scene {
   private performListen(time: number): void {
     this.currentSoundLandmarks = nearbySoundLandmarks(this.sceneId, { x: this.player.x, y: this.player.y }, this.facing);
     this.currentSoundLandmarks.forEach((landmark, index) => {
-      discoverLandmark(landmark.id);
       this.addEvidence(`sound:${landmark.id}`, landmark.label, time);
       const pan = landmark.direction === "左侧" ? -0.72 : landmark.direction === "右侧" ? 0.72 : 0;
       this.time.delayedCall(index * 210, () => audioDirector.listenCue(landmark.tone, pan));
@@ -1048,7 +1046,6 @@ abstract class WalkScene extends Phaser.Scene {
       flashCooling: this.time.now < this.flashCooldownUntil,
       listenCooling: this.time.now < this.listenCooldownUntil,
       listening: this.time.now < this.listeningUntil,
-      knownLandmarks: snapshot.knownLandmarks,
       routeChoice: snapshot.routeChoice,
       eggTartBoostRemainingMs: Math.max(0, Math.round(this.eggTartRemainingMs)),
       contact: this.contact,
@@ -1085,7 +1082,6 @@ abstract class WalkScene extends Phaser.Scene {
       })),
       nearbySoundLandmarks: nearby.map(({ id, label, direction, distance }) => ({ id, label, direction, distance })),
       recentEvidence: this.recentEvidence.filter((entry) => entry.expiresAt > this.time.now).map((entry) => entry.label),
-      knownLandmarks: snapshot.knownLandmarks,
       routeChoice: snapshot.routeChoice,
       openingReply: snapshot.openingReply,
       movementSurface: this.movementSurface,
@@ -1188,7 +1184,6 @@ export class BusStopScene extends WalkScene {
     if (this.signConfirmed || !this.signTouched || !this.routeEngineHeard) return;
     this.signConfirmed = true;
     this.objectiveId = "board-17";
-    collectMemory("border-hand");
     setCheckpoint("bus-stop-sign");
     audioDirector.interact();
     this.announce("组合确认完成：凸字17、对应引擎声与车门方向一致。现在沿盲道向右前方到车门。");
@@ -1391,7 +1386,7 @@ export class BusInteriorScene extends WalkScene {
     this.renderBusOccupants();
     const snapshot = getSnapshot();
     this.cardConfirmed = snapshot.objectiveId !== "find-card-reader";
-    this.cardReaderHeard = this.cardConfirmed || snapshot.knownLandmarks.includes("bus-card-reader");
+    this.cardReaderHeard = this.cardConfirmed;
     this.seatConfirmed = snapshot.objectiveId === "ring-bell" || snapshot.busState === "seated";
     this.activeSeatSpot = BUS_SEAT_SPOTS.find((spot) => spot.id === snapshot.selectedSeatId && !spot.occupied) ?? null;
     const closeTip = gameEvents.on("tipClosed", (tip) => {
@@ -1439,13 +1434,11 @@ export class BusInteriorScene extends WalkScene {
     } else if (surface.kind === "seat") {
       this.activeSeatSpot = this.nearestSeatSurface(surface.point) ?? this.activeSeatSpot;
       this.seatConfirmed = true;
-      discoverLandmark("bus-seat");
       this.addEvidence("bus:seat-touch", "确认座椅软垫与金属框");
       audioDirector.interact();
       this.announce("座位边缘已确认：软垫和金属框就在旁边，靠近后按 E 坐下。");
     } else if (surface.kind === "bell") {
       this.bellConfirmed = true;
-      discoverLandmark("bus-bell");
       audioDirector.interact();
       this.announce("按铃位置已确认：没有倒计时，靠近后按 E 按铃。");
     }
@@ -1457,8 +1450,6 @@ export class BusInteriorScene extends WalkScene {
       this.addEvidence("bus:reader-sound", "听见刷卡机短促电子音");
       if (this.cardContacted) this.announce("电子音与刚才摸到的机身位置一致，可以按 E 刷卡。");
     }
-    if (landmarks.some((landmark) => landmark.id === "bus-seat")) discoverLandmark("bus-seat");
-    if (landmarks.some((landmark) => landmark.id === "bus-bell")) discoverLandmark("bus-bell");
   }
 
   protected updateInteraction(_time: number): void {
@@ -1632,200 +1623,14 @@ export class BusInteriorScene extends WalkScene {
   private finishAfterBell(): void {
     if (!this.bellPressed || this.transitioningAfterBell) return;
     this.transitioningAfterBell = true;
-    patchSnapshot(busRideCheckpointAfterBell(getSnapshot().busState));
-    gameEvents.emit("chapter", { from: "bus-interior", to: "bus-ride" });
+    patchSnapshot(oldCityCheckpointAfterBell(getSnapshot().busState));
+    gameEvents.emit("chapter", { from: "bus-interior", to: "old-city" });
     // The React tip layer resumes the paused scene immediately after emitting
     // tipClosed. Let that resume finish before starting the next Phaser scene.
-    this.time.delayedCall(1, () => this.scene.start("bus-ride"));
+    this.time.delayedCall(1, () => this.scene.start("old-city"));
   }
 }
 
-export class BusRideScene extends Phaser.Scene {
-  private startedAt = 0;
-  private ended = false;
-  private keys!: { listen: Phaser.Input.Keyboard.Key; mark: Phaser.Input.Keyboard.Key; repeat: Phaser.Input.Keyboard.Key; pause: Phaser.Input.Keyboard.Key };
-  private panorama!: Phaser.GameObjects.TileSprite;
-  private scrollAccumulator = 0;
-  private shakeAccumulator = 0;
-  private shakeOffset = 0;
-  private cueIndex = 0;
-  private heardCurrent = false;
-  private subtitle = "车轮碾过湿润的石路。沿途的声音可以成为返程线索。";
-  private readonly cues: Array<{ id: BusRideLandmarkId; label: string; tone: number; pan: number }> = [
-    { id: "elevated-rain", label: "雨珠密密敲在右侧车窗", tone: 520, pan: 0.68 },
-    { id: "harbor-horn", label: "远处港湾传来低沉船笛", tone: 176, pan: -0.62 },
-    { id: "bakery-bell", label: "旧城面包店的门铃从左侧掠过", tone: 840, pan: -0.76 },
-  ];
-
-  constructor() {
-    super("bus-ride");
-  }
-
-  preload(): void {
-    if (!this.textures.exists("bus-window-panorama")) this.load.image("bus-window-panorama", busWindowPanoramaUrl);
-  }
-
-  create(): void {
-    ensureGroundTextures(this);
-    BUS_INTERIOR_TILEMAP.groundRows.forEach((row, rowIndex) => [...row].forEach((char, colIndex) => {
-      const key = BUS_INTERIOR_TILEMAP.legend[char] ?? "bus-floor";
-      const variant = deterministicTileVariant("bus-ride", colIndex, rowIndex, key);
-      this.add.image(colIndex * 16 + 8, rowIndex * 16 + 12, GROUND_TEXTURE[key].base[variant]);
-    }));
-    this.panorama = this.add.tileSprite(320, 82, 620, 96, "bus-window-panorama").setDepth(80);
-    const windowFrame = this.add.graphics().setDepth(82);
-    windowFrame.fillStyle(0x302d29, 1);
-    windowFrame.fillRect(4, 28, 632, 8);
-    windowFrame.fillRect(4, 130, 632, 8);
-    windowFrame.fillRect(4, 28, 8, 110);
-    windowFrame.fillRect(628, 28, 8, 110);
-    [160, 320, 480].forEach((x) => windowFrame.fillRect(x - 3, 34, 6, 96));
-    windowFrame.fillStyle(0x8d887e, 0.9);
-    windowFrame.fillRect(12, 36, 616, 2);
-    [132, 252, 388, 508].forEach((x) => renderMapDecoration(this, { kind: "bus-pole", x, y: 356, width: 10, height: 220, depth: 200 }));
-    this.add.rectangle(320, 180, 640, 360, 0x6b6257, 0.06).setDepth(300);
-    const state = getSnapshot().busState === "seated" ? transitionBus("seated", "depart") : "riding";
-    patchSnapshot({ busState: state as BusTransitState, scene: "bus-ride", objectiveId: "ride-to-camoes" });
-    this.keys = {
-      listen: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.R),
-      mark: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E),
-      repeat: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.H),
-      pause: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC),
-    };
-    this.startedAt = this.time.now;
-    gameEvents.emit("scene", "bus-ride");
-    audioDirector.enterScene("bus-ride");
-    this.emitRideHud();
-    this.time.delayedCall(5200, () => this.advanceCue(1, "车内报站：下一站，白鸽巢总站。新的声音从窗外靠近。"));
-    this.time.delayedCall(10400, () => this.advanceCue(2, "17路转入旧城。你可以继续听，也可以只坐稳感受车身减速。"));
-    this.time.delayedCall(16800, () => this.finishRide());
-  }
-
-  update(_time: number, delta: number): void {
-    if (!getSnapshot().settings.reducedMotion) {
-      this.scrollAccumulator += delta;
-      while (this.scrollAccumulator >= 120) {
-        this.scrollAccumulator -= 120;
-        this.panorama.tilePositionX = Math.round(this.panorama.tilePositionX + 2);
-      }
-      this.shakeAccumulator += delta;
-      if (this.shakeAccumulator >= 240) {
-        this.shakeAccumulator %= 240;
-        this.shakeOffset = this.shakeOffset ? 0 : 1;
-        this.cameras.main.setScroll(0, this.shakeOffset);
-      }
-    } else if (this.cameras.main.scrollY !== 0) {
-      this.cameras.main.setScroll(0, 0);
-    }
-    if (Phaser.Input.Keyboard.JustDown(this.keys.pause)) {
-      this.scene.pause();
-      gameEvents.emit("pause", true);
-    }
-    if (Phaser.Input.Keyboard.JustDown(this.keys.listen)) this.listenCurrentCue();
-    if (Phaser.Input.Keyboard.JustDown(this.keys.mark)) this.markCurrentCue();
-    if (Phaser.Input.Keyboard.JustDown(this.keys.repeat)) {
-      this.subtitle = `${JOURNEY_GOAL}。当前任务：听辨车窗外的声音，并按 E 记下可识别的地标。`;
-      audioDirector.speak(this.subtitle);
-      this.emitRideHud();
-    }
-  }
-
-  private emitRideHud(): void {
-    const snapshot = getSnapshot();
-    gameEvents.emit("hud", {
-      objective: "沿途听辨声音，前往白鸽巢",
-      journeyGoal: JOURNEY_GOAL,
-      subtitle: this.subtitle,
-      prompt: "R  聆听当前声音  ·  E  记下声音  ·  H  重复目标",
-      memories: snapshot.memories.length,
-      detours: snapshot.detourScore,
-      sceneLabel: SCENE_LABELS["bus-ride"],
-      hintCooling: false,
-      flashCooling: false,
-      listenCooling: false,
-      listening: false,
-      knownLandmarks: snapshot.knownLandmarks,
-      routeChoice: snapshot.routeChoice,
-      eggTartBoostRemainingMs: snapshot.eggTartBoostRemainingMs,
-      contact: "车厢行驶中",
-      contactHistory: [],
-    });
-  }
-
-  private advanceCue(index: number, narration: string): void {
-    this.cueIndex = index;
-    this.heardCurrent = false;
-    this.subtitle = narration;
-    audioDirector.speak(narration);
-    this.emitRideHud();
-  }
-
-  private listenCurrentCue(): void {
-    const cue = this.cues[this.cueIndex];
-    this.heardCurrent = true;
-    audioDirector.listenCue(cue.tone, cue.pan);
-    this.subtitle = `你专注聆听：${cue.label}。若想把它作为路线笔记，按 E 记下。`;
-    audioDirector.speak(this.subtitle);
-    this.emitRideHud();
-  }
-
-  private markCurrentCue(): void {
-    const cue = this.cues[this.cueIndex];
-    if (!this.heardCurrent) {
-      this.subtitle = "先按 R 驻足聆听，再决定是否把这段声音写进路线笔记。";
-      audioDirector.cooldown();
-      this.emitRideHud();
-      return;
-    }
-    const recognized = Array.from(new Set([...getSnapshot().busRideRecognized, cue.id]));
-    patchSnapshot({ busRideRecognized: recognized });
-    if (cue.id === "harbor-horn") discoverLandmark("harbor-horn");
-    collectMemory("bus-rain");
-    this.subtitle = `已记下：${cue.label}。这不是限时题，下一段声音出现后仍可继续听辨。`;
-    audioDirector.interact();
-    this.emitRideHud();
-  }
-
-  private finishRide(): void {
-    if (this.ended) return;
-    this.ended = true;
-    const arrived = transitionBus(getSnapshot().busState, "arrive");
-    patchSnapshot({ busState: arrived, scene: "old-city", objectiveId: "request-crossing", resumeStage: "old-city-entry" });
-    gameEvents.emit("chapter", { from: "bus-ride", to: "old-city" });
-    this.scene.start("old-city");
-  }
-
-  public renderGameToText(): GameTextState {
-    const snapshot = getSnapshot();
-    const cue = this.cues[this.cueIndex];
-    return {
-      coordinateSystem: "origin top-left; x right; y down; canvas 640x360",
-      mode: this.scene.isPaused() ? "paused" : "playing",
-      gameMode: snapshot.settings.gameMode,
-      scene: "bus-ride",
-      journeyGoal: JOURNEY_GOAL,
-      player: null,
-      objective: { id: "ride-to-camoes", label: "沿途听辨声音，前往白鸽巢", target: { x: 0, y: 0 } },
-      prompt: "R 聆听当前声音；E 记下声音",
-      subtitle: this.subtitle,
-      contact: "车厢行驶中",
-      npcs: [],
-      nearbySoundLandmarks: [{ id: cue.id, label: cue.label, direction: cue.pan < 0 ? "左侧" : "右侧", distance: 0 }],
-      recentEvidence: snapshot.busRideRecognized.map((id) => this.cues.find((candidate) => candidate.id === id)?.label ?? id),
-      knownLandmarks: snapshot.knownLandmarks,
-      routeChoice: snapshot.routeChoice,
-      openingReply: snapshot.openingReply,
-      movementSurface: "stationary",
-      movementSpeedMultiplier: 1,
-      eggTartPurchased: snapshot.eggTartPurchased,
-      eggTartBoostRemainingMs: snapshot.eggTartBoostRemainingMs,
-      insideEggTartScentZone: false,
-      eggTartScentPrompted: snapshot.eggTartScentPrompted,
-      cooldowns: { hintMs: 0, flashMs: 0, listenMs: 0 },
-      flags: { controlsLocked: true, dialogueOpen: false, listening: this.heardCurrent, ending: snapshot.ending },
-    };
-  }
-}
 export class OldCityScene extends WalkScene {
   protected sceneId = "old-city" as const;
   protected spawn = new Phaser.Math.Vector2(40, 284);
@@ -1960,8 +1765,6 @@ export class OldCityScene extends WalkScene {
       this.addEvidence("crossing:signal", "听见路口过街信号双音");
       if (this.crossingCurbConfirmed && this.crossingState === "approach") this.announce("双音位置与杖头确认的路缘点阵一致，可以按 E 请求通行。");
     }
-    if (landmarks.some((landmark) => landmark.id === "egg-tart-oven")) discoverLandmark("egg-tart-oven");
-    if (landmarks.some((landmark) => landmark.id === "pet-shop-bell")) discoverLandmark("pet-shop-bell");
   }
 
   protected updateInteraction(_time: number): void {
@@ -2090,8 +1893,8 @@ export class OldCityScene extends WalkScene {
     }
     if (npcId === "egg-tart-vendor" && optionId === "buy" && !getSnapshot().eggTartPurchased) {
       this.activateEggTartBoost();
-      discoverLandmark("egg-tart-oven");
-      this.announce("你吃下暖热的蛋挞。接下来可控制的60秒内，移动速度提升60%；暂停、对话和过场不会消耗时间。");
+      collectMemory("egg-tart");
+      this.announce("你吃下暖热的蛋挞，把这份暖意收进记忆。接下来可控制的60秒内，移动速度提升60%；暂停、对话和过场不会消耗时间。");
       return;
     }
     if (npcId !== "pet-shop-clerk" || optionId === "later") return;
@@ -2252,11 +2055,13 @@ export class RuinsScene extends WalkScene {
   protected onListen(landmarks: Array<SoundLandmark & { distance: number; direction: string }>): void {
     if (landmarks.some((landmark) => landmark.id === "ruins-wheelchair")) {
       this.wheelchairHeard = true;
-      discoverLandmark("ruins-wheelchair");
       this.addEvidence("ruins:wheelchair-sound", "听见林伯轮椅的轻响");
       if (this.wheelchairConfirmed) this.announce("轮椅轻响与杖头确认的脚踏板位置一致。可以按 E 问候林伯。");
     }
-    if (landmarks.some((landmark) => landmark.id === "ruins-rain")) discoverLandmark("ruins-rain");
+    if (landmarks.some((landmark) => landmark.id === "ruins-rain")) {
+      collectMemory("ruins-rain");
+      this.announce("记忆回声：牌坊下的雨声。你在语音里听过它——林伯说，听到这里的雨声就给他消息。");
+    }
   }
 
   protected updateInteraction(): void {

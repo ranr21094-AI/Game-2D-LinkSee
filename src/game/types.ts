@@ -1,4 +1,4 @@
-export type SceneId = "bus-stop" | "bus-interior" | "bus-ride" | "old-city" | "ruins";
+export type SceneId = "bus-stop" | "bus-interior" | "old-city" | "ruins";
 
 export type TilePoint = { x: number; y: number };
 
@@ -62,7 +62,7 @@ export type BusTransitState =
   | "arrived"
   | "alighted";
 
-export type MemoryId = "bus-rain" | "old-city-bell" | "border-hand";
+export type MemoryId = "old-city-bell" | "egg-tart" | "ruins-rain";
 export type EndingId = "reunion" | "detour" | "return";
 export type TipId = "sighted-guide" | "bus-access" | "bus-ride-access" | "wheelchair-pushing" | "guide-dog-access";
 
@@ -79,11 +79,11 @@ export type TipDefinition = {
 
 export type GameMode = "experience" | "night";
 
-export type OpeningReply = "old-place" | "careful" | "call-nearby";
+export type OpeningReply = "old-place";
 export type EndingChoice = "photo" | "listen-rain" | "share-memories";
 export type RouteChoice = "shop-wall" | "curb-edge";
 
-export type KnownLandmarkId =
+export type SoundLandmarkId =
   | "gate-rain"
   | "route-17-engine"
   | "bus-card-reader"
@@ -96,8 +96,6 @@ export type KnownLandmarkId =
   | "pet-shop-bell"
   | "ruins-wheelchair"
   | "ruins-rain";
-
-export type BusRideLandmarkId = "elevated-rain" | "harbor-horn" | "bakery-bell";
 
 export type GameSettings = {
   masterVolume: number;
@@ -115,7 +113,6 @@ export type ResumeStage =
   | "bus-interior-entry"
   | "bus-interior-seat"
   | "bus-interior-bell"
-  | "bus-ride"
   | "old-city-entry"
   | "old-city-wait"
   | "old-city-go"
@@ -141,8 +138,6 @@ export type GameSnapshotV5 = {
   openingReply: OpeningReply | null;
   endingChoice: EndingChoice | null;
   routeChoice: RouteChoice | null;
-  knownLandmarks: KnownLandmarkId[];
-  busRideRecognized: BusRideLandmarkId[];
   npcChoices: Record<string, string>;
   eggTartPurchased: boolean;
   eggTartBoostRemainingMs: number;
@@ -170,7 +165,6 @@ export type HudState = {
   listening: boolean;
   contact: string;
   contactHistory: string[];
-  knownLandmarks: KnownLandmarkId[];
   routeChoice: RouteChoice | null;
   eggTartBoostRemainingMs: number;
 };
@@ -189,7 +183,6 @@ export type GameTextState = {
   npcs: Array<{ id: string; label: string; x: number; y: number; distance: number }>;
   nearbySoundLandmarks: Array<{ id: string; label: string; direction: string; distance: number }>;
   recentEvidence: string[];
-  knownLandmarks: KnownLandmarkId[];
   routeChoice: RouteChoice | null;
   openingReply: OpeningReply | null;
   movementSurface: "tactile" | "off-path" | "road" | "pathless" | "stationary";

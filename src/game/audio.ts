@@ -1,6 +1,7 @@
 import rainUrl from "../assets/audio/rain.ogg";
 import trafficUrl from "../assets/audio/traffic.ogg";
 import busInteriorUrl from "../assets/audio/bus-interior.ogg";
+import voicemailUrl from "../assets/audio/voicemail-lin.ogg";
 import { getSnapshot } from "./store";
 import type { GroundTileKey } from "./ground-tiles";
 import type { SceneId } from "./types";
@@ -11,7 +12,6 @@ const AMBIENT_URLS: Record<AmbientId, string> = { rain: rainUrl, traffic: traffi
 const SCENE_AMBIENCE: Record<SceneId, Partial<Record<AmbientId, number>>> = {
   "bus-stop": { rain: 0.5, traffic: 0.34 },
   "bus-interior": { bus: 0.56 },
-  "bus-ride": { bus: 0.62, rain: 0.18 },
   "old-city": { rain: 0.4, traffic: 0.5 },
   ruins: { rain: 0.34, traffic: 0.08 },
 };
@@ -120,6 +120,14 @@ class AudioDirector {
     const settings = getSnapshot().settings;
     utterance.volume = Math.min(1, settings.masterVolume * settings.dialogueVolume);
     window.speechSynthesis.speak(utterance);
+  }
+
+  playVoicemail(): void {
+    window.speechSynthesis?.cancel();
+    const audio = new Audio(voicemailUrl);
+    const settings = getSnapshot().settings;
+    audio.volume = Math.min(1, settings.masterVolume * settings.dialogueVolume);
+    void audio.play().catch(() => {});
   }
 
   caneTap(kind: "tactile" | "stone" | "metal" | "fabric" | "obstacle" = "tactile"): void {

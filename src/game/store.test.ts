@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SAVE_KEY, discoverLandmark, getActiveElapsedMs, getSnapshot, loadSnapshot, patchSnapshot, pauseActiveTimer, recordNpcChoice, resumeActiveTimer, setCheckpoint, startNewGame, unlockTip } from "./store";
+import { SAVE_KEY, collectMemory, getActiveElapsedMs, getSnapshot, loadSnapshot, patchSnapshot, pauseActiveTimer, recordNpcChoice, resumeActiveTimer, setCheckpoint, startNewGame, unlockTip } from "./store";
 
 class MemoryStorage implements Storage {
   private values = new Map<string, string>();
@@ -85,20 +85,30 @@ describe("V5 game snapshot", () => {
     expect(loadSnapshot()?.unlockedTips).toEqual(["wheelchair-pushing"]);
   });
 
-  it("persists Plan 2 journey, landmark, route and egg-tart state", () => {
-    patchSnapshot({ openingReply: "careful", routeChoice: "shop-wall", eggTartPurchased: true, eggTartBoostRemainingMs: 42_500, eggTartScentPrompted: true });
-    discoverLandmark("egg-tart-oven");
+  it("persists Plan 2 journey, route and egg-tart state", () => {
+    patchSnapshot({ openingReply: "old-place", routeChoice: "shop-wall", eggTartPurchased: true, eggTartBoostRemainingMs: 42_500, eggTartScentPrompted: true });
     recordNpcChoice("egg-tart-vendor", "buy");
     expect(loadSnapshot()).toMatchObject({
       version: 5,
-      openingReply: "careful",
+      openingReply: "old-place",
       routeChoice: "shop-wall",
-      knownLandmarks: ["egg-tart-oven"],
       eggTartPurchased: true,
       eggTartBoostRemainingMs: 42_500,
       eggTartScentPrompted: true,
       npcChoices: { "egg-tart-vendor": "buy" },
     });
+  });
+
+  it("persists collected memories without duplicating them", () => {
+    collectMemory("egg-tart");
+    collectMemory("egg-tart");
+    expect(getSnapshot().memories).toEqual(["egg-tart"]);
+    expect(loadSnapshot()?.memories).toEqual(["egg-tart"]);
+  });
+
+  it("filters removed memory ids from an older save", () => {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ ...getSnapshot(), memories: ["old-city-bell", "bus-rain", "border-hand"] }));
+    expect(loadSnapshot()?.memories).toEqual(["old-city-bell"]);
   });
 
   it("migrates a V4 save instead of discarding the journey", () => {

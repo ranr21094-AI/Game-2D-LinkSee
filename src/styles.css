@@ -150,20 +150,13 @@ h2 { color: #ffe3a0; font-size: clamp(1.8rem, 4vw, 2.7rem); }
 }
 .opening-screen::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(0, 0, 0, 0.05) 3px 4px); }
 .opening-card { position: relative; display: grid; grid-template-columns: minmax(220px, 290px) minmax(0, 540px); gap: 30px; width: min(900px, 100%); padding: 28px; }
-.old-photo { position: relative; min-height: 390px; overflow: hidden; border: 10px solid #d1c5a4; outline: 3px solid #2a2721; background: #8c897d; filter: sepia(0.3) saturate(0.72); image-rendering: pixelated; }
-.old-photo::before { content: ""; position: absolute; inset: 8px; border: 2px solid rgba(40, 35, 28, 0.55); }
-.old-photo::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 42%; background: #6e6a60; border-top: 5px solid #afa88f; }
+.old-photo { position: relative; align-self: start; aspect-ratio: 3 / 4; overflow: hidden; border: 10px solid #d1c5a4; outline: 3px solid #2a2721; background: #8c897d; filter: sepia(0.3) saturate(0.72); image-rendering: pixelated; }
+.old-photo::before { content: ""; position: absolute; z-index: 2; inset: 8px; border: 2px solid rgba(40, 35, 28, 0.55); }
+.old-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .old-photo small { position: absolute; z-index: 4; left: 12px; bottom: 9px; color: #e9ddbd; font-family: "Noto Serif CJK SC", "SimSun", serif; letter-spacing: 0.08em; }
-.photo-ruins { position: absolute; z-index: 1; left: 50%; top: 45px; width: 146px; height: 170px; transform: translateX(-50%); border: 12px solid #5a574f; border-bottom: 0; box-shadow: inset 0 0 0 7px #aaa58f; }
-.photo-ruins::before { content: ""; position: absolute; left: 20px; right: 20px; top: -30px; height: 34px; background: #5a574f; box-shadow: 16px -12px #5a574f, 48px -12px #5a574f; }
-.photo-ruins::after { content: ""; position: absolute; left: 34px; top: 42px; width: 52px; height: 98px; border: 9px solid #5a574f; border-bottom: 0; }
-.photo-person { position: absolute; z-index: 3; bottom: 46px; width: 30px; height: 86px; background: #34332f; box-shadow: 0 -24px 0 -5px #34332f; }
-.photo-person-one { left: calc(50% - 44px); }
-.photo-person-two { left: calc(50% + 14px); height: 92px; }
 .opening-copy { align-self: center; }
 .opening-copy h2 { margin-bottom: 16px; }
-.voice-message { margin: 0 0 10px; padding: 16px 18px; border-left: 4px solid var(--gold); background: #171917; color: #f2ead8; font-family: "Noto Serif CJK SC", "SimSun", serif; font-size: 1.05rem; line-height: 1.8; }
-.voice-replay { border: 0; border-bottom: 1px solid #8f7951; background: transparent; color: #d8bb78; padding: 4px 0; }
+.voice-message { margin: 0 0 10px; padding: 16px 18px; border-left: 4px solid var(--gold); background: #171917; color: #f2ead8; font-family: "Noto Serif CJK SC", "SimSun", serif; font-size: 0.9rem; line-height: 1.8; }
 .journey-contract { display: grid; gap: 5px; margin: 18px 0; padding: 13px 15px; border: 1px solid #8b744d; background: #24231f; }
 .journey-contract span, .reply-label { color: #b79a5f; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.11em; }
 .journey-contract strong { color: #ffe1a0; font-family: "Noto Serif CJK SC", "SimSun", serif; font-size: 1.12rem; }
@@ -351,8 +344,7 @@ input[type="range"] { accent-color: #f0c962; }
   .title-copy { max-height: calc(100vh - 22px); overflow: auto; padding: 24px; }
   .opening-screen { padding: 12px; }
   .opening-card { grid-template-columns: 190px minmax(0, 1fr); gap: 18px; padding: 18px; }
-  .old-photo { min-height: 318px; }
-  .voice-message { padding: 10px 12px; font-size: 0.9rem; line-height: 1.55; }
+  .voice-message { padding: 10px 12px; font-size: 0.82rem; line-height: 1.55; }
   .journey-contract { margin: 10px 0; }
   .title-subtitle { margin: 9px auto 13px; line-height: 1.5; }
   .disclaimer { margin-top: 12px; }

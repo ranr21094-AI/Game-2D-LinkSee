@@ -1,10 +1,10 @@
-import type { KnownLandmarkId, SceneId, TilePoint } from "./types";
+import type { SceneId, SoundLandmarkId, TilePoint } from "./types";
 import { BUS_CARD_READER } from "./businterior-map";
 
 export type Facing = "up" | "down" | "left" | "right";
 
 export type SoundLandmark = {
-  id: KnownLandmarkId;
+  id: SoundLandmarkId;
   scene: Exclude<SceneId, "bus-ride">;
   point: TilePoint;
   label: string;
@@ -60,6 +60,6 @@ export function nearbySoundLandmarks(scene: Exclude<SceneId, "bus-ride">, player
 }
 
 export function listeningReport(landmarks: ReturnType<typeof nearbySoundLandmarks>): string {
-  if (!landmarks.length) return "你驻足聆听。附近只有雨声和自己的脚步，没有新的声音地标。";
+  if (!landmarks.length) return "你驻足聆听。附近只有雨声和自己的脚步，没有可辨认的声音。";
   return `你驻足聆听。${landmarks.map((landmark) => `${landmark.direction}${distanceBand(landmark.distance)}：${landmark.label}`).join("；")}。`;
 }

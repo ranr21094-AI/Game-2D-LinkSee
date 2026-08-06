@@ -20,8 +20,6 @@
 | `src/assets/npc-spritesheet.png` | 两名问路 NPC | ImageGen 角色表，透明化后使用 |
 | `src/assets/chapter-map-pixel-v2.png` | 章节过场像素城市背景（640×360） | 内置 ImageGen 以旧章节图为构图参考、以当前游戏截图为风格参考生成；二次编辑彻底移除五个圆点与连接线，再以 nearest-neighbor 降采样并量化为 96 色；画面不含路线、文字、人物或 HUD |
 | `docs/q-align/chapter-map-pixel-source.png` | 新章节背景生成记录与复核源图 | 16:9 暖灰雨夜澳门城市；關閘、候车站、骑楼街区和大三巴仅作环境叙事，场景名称由 React 文字卡叠加 |
-| `src/assets/bus-window-panorama-pixel.png` | 巴士过场车窗外街景条（1024×96） | 内置 ImageGen 生成雨夜澳门骑楼横向街景；取原图中段、nearest-neighbor 缩放并量化为 96 色，只在车窗模块中整数像素滚动 |
-| `docs/q-align/bus-window-panorama-source.png` | 车窗街景生成记录与复核源图 | 无人物、车辆、标牌、路线、可读文字和 HUD；生产只裁取窄幅街景，不作为全屏背景 |
 | `src/assets/traveler-sit.png` | 候车长椅坐姿玩家精灵 | 基于玩家正面像素角色生成并裁切为 64×64；运行时脚底锚定长椅中心，人物整体绘制在长椅前层 |
 | `src/assets/traveler-sit-up.png` | 公交车厢下排座椅的向上/背向坐姿玩家精灵 | 内置 ImageGen 参考 `traveler-sit.png` 生成；绿幕去除辅助处理后以 nearest-neighbor 缩至 64×64，无盲杖 |
 | `docs/q-align/traveler-sit-up-source.png` | 下排坐姿生成记录与复核源图 | 内置 ImageGen 生成的背向坐姿源图；生产资源仅保留透明像素角色，不含绿幕 |
@@ -35,6 +33,8 @@
 | `docs/q-align/generated-sources/lam-daughter-push-source.png` | 女儿推行生成记录与复核源图 | 三个背向推行姿态，纯绿幕，不包含轮椅、文字、品牌或 HUD |
 | `src/assets/wheelchair-pushing-tip-pixel.png` | “轮椅推行需要学习”完整横向公益插画（960×480） | Seedream（豆包生图）生成三段连续场景：检查双手与脚踏板、沿坡道向上推行身体前倾、下坡背对坡道倒退并控制刹车；用户参考图仅用于动作关系，不复制人物、排版、文字或水印 |
 | `docs/q-align/generated-sources/wheelchair-pushing-tip-source.png` | 轮椅推行贴士生成记录与复核源图（3072×1536 原图） | 暖灰雨夜澳门像素场景，无品牌、可读文字、箭头、HUD 或水印；中文标题与安全说明由 React 叠加 |
+| `src/assets/old-photo-pixel.png` | 开场页“一条未读语音 · 林伯”左相框的竖版旧合照（432×576） | Seedream（豆包生图）竖版 1728×2304 原图经 nearest-neighbor 缩至 432×576 并量化为 96 色；暖灰雨夜大三巴前二人旧合照，无文字、品牌、水印或 HUD |
+| `docs/q-align/generated-sources/old-photo-source.png` | 旧合照生成记录与复核源图（1728×2304 原图） | 雨后大三巴牌坊前，年轻林伯（白发、橄榄绿外套、颈挂胶片相机）与持盲杖青年旅行者并肩站立；地面有雨水反光，牌坊门洞与石阶清晰可辨 |
 | `src/assets/guide-dog-tip-pixel.png` | "导盲犬在澳门"完整横向公益插画（960×480） | Seedream（豆包生图）生成三段连续场景：视障者与导盲犬被挡在贴有禁宠标志的门外、检疫柜台前导盲犬隔离笼与成堆文件、导盲机器人止步于楼梯前；无品牌、可读文字、水印或真实人物元素 |
 | `docs/q-align/generated-sources/guide-dog-tip-source.png` | 导盲犬贴士生成记录与复核源图（3072×1536 原图） | 暖灰雨夜澳门像素场景；中文标题与制度说明由 React 叠加 |
 | `src/assets/sighted-guide-tutorial-pixel.png` | 口岸序章的扶盲教学三格插图（960×520） | 内置 ImageGen 参考用户提供的动作说明图，仅保留正确动作关系并改为暖灰雨夜像素风；裁去外边距、nearest-neighbor 缩放并量化为 128 色；所有中文说明由 React 叠加 |
@@ -45,7 +45,7 @@
 | `src/assets/bus-ride-access-tip-pixel.png` | 公交无障碍贴士完整公益插画 | 内置 ImageGen 生成单张暖灰雨夜像素车厢场景；盲人乘客与公众/司机通过姿态表现先询问、说清楚、再协助；无品牌、可读文字、水印或用户照片元素 |
 | `docs/q-align/gate-facade-source.png` | 已退役的关闸立面参考源图 | 仅保留为历史美术参考；生产代码不再导入或裁切该图。关闸现由 parapet/window/wall/canopy/pillar/entrance 六类 16px 程序化瓦片和代码文字牌组成，并进入统一 base/memory/warm 三态 |
 
-本轮建筑与过场提示约束为：雨夜暖灰澳门葡中建筑、16-bit 像素模块、统一比例；禁止 HUD、路线、品牌和非代码可读文字。章节图不含预绘制圆点或连线，车窗图只作为窄幅模块，关闸建筑完全瓦片化且不参与盲道逻辑。扶盲教学图允许人物，但正确动作和中文说明分别由插图与代码承担。
+本轮建筑与过场提示约束为：雨夜暖灰澳门葡中建筑、16-bit 像素模块、统一比例；禁止 HUD、路线、品牌和非代码可读文字。章节图不含预绘制圆点或连线，关闸建筑完全瓦片化且不参与盲道逻辑。扶盲教学图允许人物，但正确动作和中文说明分别由插图与代码承担。
 
 轮椅推行贴士文案根据 [NHS 标准轮椅安全信息](https://www.fhft.nhs.uk/patients-and-visitors/patient-information-library/wheelchair-safety-information-standard-wheelchairs) 与 [WHO 轮椅服务培训资料](https://www.who.int/publications/i/item/9789241512398) 整理，强调先询问、移动前说明、检查双手与脚踏板、平地不得突然加速/急刹/急转、上坡身体前倾缓慢推进、下坡背对坡道倒退行进并全程控刹车、上下台阶先停稳再踩倾斜杆操作，并在坡度或操作超出能力时停止和寻求受训协助；未使用未经核实的统计数字。
 
@@ -57,6 +57,20 @@
 | --- | --- | --- |
 | `src/assets/audio/rain.ogg` | 户外雨后底噪 | OpenGameArt [Rain (loopable)](https://opengameart.org/content/rain-loopable)，Ylmir，CC0；采用包内 `1.ogg` |
 | `src/assets/audio/traffic.ogg` | 公交站、旧城道路和路口 | OpenGameArt [High traffic road sounds](https://opengameart.org/content/high-traffic-road-sounds)，IgnasD，CC0 |
-| `src/assets/audio/bus-interior.ogg` | 车厢与行驶过场 | Freesound [Interior sound of a bus](https://freesound.org/s/456833/)，florianreichelt，CC0；使用公开 OGG 预览编码 |
+| `src/assets/audio/bus-interior.ogg` | 车厢 | Freesound [Interior sound of a bus](https://freesound.org/s/456833/)，florianreichelt，CC0；使用公开 OGG 预览编码 |
 
 三个文件均随构建离线打包；运行时解码或自动播放失败时，程序化盲杖、脚步、提示音和字幕仍可继续工作。
+
+## 生成语音
+
+| 项目素材 | 场景 | 来源与许可 |
+| --- | --- | --- |
+| `src/assets/audio/voicemail-lin.ogg` | 开场「一条未读语音 · 林伯」粤语广播 | Microsoft Edge 在线神经 TTS `zh-HK-WanLungNeural`（粤语男声，契合林伯）经 `edge-tts` 生成 mp3，再用 `imageio-ffmpeg` 自带 ffmpeg 转码为 ogg（vorbis，10s，约 57KB）；**非 CC0**，为 Edge TTS 语音输出；随构建离线内嵌，可在联网机器上按下方命令重新生成 |
+
+生成命令：
+
+```
+pip install edge-tts imageio-ffmpeg
+python -m edge_tts --voice zh-HK-WanLungNeural --text "小闻，雨小了。我在大三巴老地方等你。慢慢来，听到牌坊下的雨声就给我消息。" --write-media src/assets/audio/voicemail-lin.mp3
+python -c "import imageio_ffmpeg, subprocess; subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), '-y', '-i', 'src/assets/audio/voicemail-lin.mp3', '-c:a', 'libvorbis', '-q:a', '5', 'src/assets/audio/voicemail-lin.ogg'], check=True)"
+```

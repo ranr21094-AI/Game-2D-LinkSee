@@ -54,10 +54,9 @@
 澳门雨后暖色约 2 秒，随后褪为约 35% 饱和度的淡彩"颜色记忆"永久保留；到达大三巴时
 整条走过的路线恢复完整色彩（M3 终章）。
 
-**场景流转**（6 个 SceneId，串行）：
-`bus-stop`（關閘候车）→ `bus-interior`（车厢找座）→ `bus-ride`（过场，非 WalkScene）
-→ `old-city`（白鸽巢，目前唯一瓦片地图场景）→ `old-city-crossing`（斜向路口）
-→ `ruins`（大三巴，结局）。
+**场景流转**（4 个 SceneId，串行）：
+`bus-stop`（關閘候车）→ `bus-interior`（车厢找座）→ `old-city`（白鸽巢，瓦片地图场景）
+→ `ruins`（大三巴，结局）。2026-08-06 起按铃后直接进入 `old-city`，不再经过车程过场场景。
 
 **`src/game/` 文件职责一览**：
 
@@ -455,8 +454,8 @@ image-to-image 以已采用图为风格参考，防止风格漂移。
 - 内置 ImageGen 生成一张 640×360 暖灰雨夜澳门像素城市背景，存
   `src/assets/chapter-map-pixel-v2.png`；画面不含路线圆点、连线或文字。
 - **React 层实现**（不进 Phaser）：App.tsx 新增 `ChapterInterstitial` 组件，监听
-  现有 `gameEvents.on("scene", ...)`，在章节边界（bus-ride→old-city、
-  old-city-crossing→ruins 等）显示 2.5 秒（任意键可跳过）：像素背景 + 起止场景文字卡。
+  现有 `gameEvents.on("scene", ...)`，在章节边界（bus-interior→old-city、
+  old-city→ruins 等）显示 2.5 秒（任意键可跳过）：像素背景 + 起止场景文字卡。
   覆盖层纯展示，场景在其后台正常加载，无阻塞。
 
 ### 6.3 收尾盘点与交付检查
@@ -491,7 +490,7 @@ image-to-image 以已采用图为风格参考，防止风格漂移。
 | M1收尾 | — | scenes.ts (G1/G2/G4)、oldcity-map.ts (G3)、content.ts (常量/纯函数)、App.tsx (G6)、design-qa.md (G5)、tactile-tiles.test.ts、oldcity-map.test.ts |
 | M2 | tilemap.ts、busstop-map.ts、businterior-map.ts、warm-image.ts、busstop-map.test.ts、businterior-map.test.ts、pixel.test.ts、src/assets/（關閘 AI 素材 5 件） | scenes.ts（钩子泛化、瓦片碰撞、BusStop/BusInterior 重写）、content.ts（PATHS/OBJECTIVES/ROUTE_BRIEFINGS/站牌座位常量）、flow.ts（checkpoint）、types.ts（CaneSurfaceKind/TileMapDefinition）、ground-tiles.ts（concrete/paint/bus-floor/bus-seat）、pixel.ts（toWarmGray）、audio.ts（车门/到站音）、store.ts（存档 v2）、App.tsx（记忆 /3）、oldcity-map.ts（改导出）、各测试、ASSET_SOURCES.md |
 | M3 | crossing-map.ts、ruins-map.ts、assist.ts、npcs.ts、crossing-map.test.ts、ruins-map.test.ts、assist.test.ts、npcs.test.ts、src/assets/（旧城/牌坊 AI 素材） | scenes.ts（Crossing/Ruins 瓦片化、F 键、NPC、终章演出、删黄点线）、content.ts、types.ts（person kind）、ground-tiles.ts（zebra/steps/calcada）、App.tsx（F 提示）、content.test.ts、ASSET_SOURCES.md |
-| M4 | src/assets/chapter-map-pixel-v2.png、src/assets/bus-window-panorama-pixel.png、NPC spritesheets、ChapterInterstitial（App.tsx 内） | npcs.ts、App.tsx、scenes.ts、design-qa.md、ASSET_SOURCES.md |
+| M4 | src/assets/chapter-map-pixel-v2.png、NPC spritesheets、ChapterInterstitial（App.tsx 内） | npcs.ts、App.tsx、scenes.ts、design-qa.md、ASSET_SOURCES.md |
 
 ## 8. 风险清单与对策
 

@@ -1,6 +1,6 @@
 import { OBJECTIVES } from "./content";
 import { checkpointForStage, isBusState, isKnownStage } from "./flow";
-import type { BusRideLandmarkId, EndingId, GameSnapshotV5, KnownLandmarkId, MemoryId, OpeningReply, ResumeStage, RouteChoice, TipId } from "./types";
+import type { EndingId, GameSnapshotV5, MemoryId, OpeningReply, ResumeStage, RouteChoice, TipId } from "./types";
 
 export const SAVE_KEY = "sound-road-macau-2d:v5";
 const LEGACY_V4_SAVE_KEY = "sound-road-macau-2d:v4";
@@ -35,8 +35,6 @@ export function createInitialSnapshot(): GameSnapshotV5 {
     openingReply: null,
     endingChoice: null,
     routeChoice: null,
-    knownLandmarks: [],
-    busRideRecognized: [],
     npcChoices: {},
     eggTartPurchased: false,
     eggTartBoostRemainingMs: 0,
@@ -100,10 +98,9 @@ function normalizeSceneResume(next: GameSnapshotV5): GameSnapshotV5 {
   return busNormalized;
 }
 
-const OPENING_REPLIES: OpeningReply[] = ["old-place", "careful", "call-nearby"];
+const OPENING_REPLIES: OpeningReply[] = ["old-place"];
 const ROUTE_CHOICES: RouteChoice[] = ["shop-wall", "curb-edge"];
-const KNOWN_LANDMARKS: KnownLandmarkId[] = ["gate-rain", "route-17-engine", "bus-card-reader", "bus-seat", "bus-bell", "harbor-horn", "old-city-crossing", "flower-bell", "egg-tart-oven", "pet-shop-bell", "ruins-wheelchair", "ruins-rain"];
-const BUS_RIDE_LANDMARKS: BusRideLandmarkId[] = ["elevated-rain", "harbor-horn", "bakery-bell"];
+const MEMORY_IDS: MemoryId[] = ["old-city-bell", "egg-tart", "ruins-rain"];
 
 export function loadSnapshot(): GameSnapshotV5 | null {
   try {
@@ -126,12 +123,10 @@ export function loadSnapshot(): GameSnapshotV5 | null {
       unlockedTips: Array.isArray(parsed.unlockedTips) ? parsed.unlockedTips.filter((id): id is TipId => id === "sighted-guide" || id === "bus-access" || id === "bus-ride-access" || id === "wheelchair-pushing" || id === "guide-dog-access") : [],
       activeElapsedMs: Number.isFinite(parsed.activeElapsedMs) ? Math.max(0, parsed.activeElapsedMs ?? 0) : 0,
       colorMemory: Array.isArray(parsed.colorMemory) ? parsed.colorMemory : [],
-      memories: Array.isArray(parsed.memories) ? parsed.memories : [],
+      memories: Array.isArray(parsed.memories) ? parsed.memories.filter((id): id is MemoryId => MEMORY_IDS.includes(id as MemoryId)) : [],
       openingReply: OPENING_REPLIES.includes(parsed.openingReply as OpeningReply) ? parsed.openingReply as OpeningReply : null,
       endingChoice: parsed.endingChoice === "photo" || parsed.endingChoice === "listen-rain" || parsed.endingChoice === "share-memories" ? parsed.endingChoice : null,
       routeChoice: ROUTE_CHOICES.includes(parsed.routeChoice as RouteChoice) ? parsed.routeChoice as RouteChoice : null,
-      knownLandmarks: Array.isArray(parsed.knownLandmarks) ? parsed.knownLandmarks.filter((id): id is KnownLandmarkId => KNOWN_LANDMARKS.includes(id as KnownLandmarkId)) : [],
-      busRideRecognized: Array.isArray(parsed.busRideRecognized) ? parsed.busRideRecognized.filter((id): id is BusRideLandmarkId => BUS_RIDE_LANDMARKS.includes(id as BusRideLandmarkId)) : [],
       npcChoices: parsed.npcChoices && typeof parsed.npcChoices === "object" ? parsed.npcChoices : {},
       eggTartPurchased: Boolean(parsed.eggTartPurchased),
       eggTartBoostRemainingMs: Number.isFinite(parsed.eggTartBoostRemainingMs) ? Math.max(0, Math.min(60_000, parsed.eggTartBoostRemainingMs ?? 0)) : 0,
@@ -195,11 +190,6 @@ export function collectMemory(id: MemoryId): GameSnapshotV5 {
 export function unlockTip(id: TipId): GameSnapshotV5 {
   if (snapshot.unlockedTips.includes(id)) return snapshot;
   return patchSnapshot({ unlockedTips: [...snapshot.unlockedTips, id] });
-}
-
-export function discoverLandmark(id: KnownLandmarkId): GameSnapshotV5 {
-  if (snapshot.knownLandmarks.includes(id)) return snapshot;
-  return patchSnapshot({ knownLandmarks: [...snapshot.knownLandmarks, id] });
 }
 
 export function recordNpcChoice(npcId: string, optionId: string): GameSnapshotV5 {

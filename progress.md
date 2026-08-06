@@ -12,6 +12,8 @@ Original prompt: 请你在本地进行修改，按照plan1.md
 
 ## Current work
 
+- 2026-08-06: Removed the 17路途中 bus-ride cutscene. Ringing the cabin bell now jumps directly to old-city (白鸽巢) with no riding scene; `oldCityCheckpointAfterBell` lands on `busState: "arrived"` so the old-city entry alights the passenger and plays "你在白鸽巢下车". Deleted the `BusRideScene` class, `bus-ride` SceneId/resume-stage/checkpoint, the `ride-to-camoes` objective, `BusRideLandmarkId`/`busRideRecognized` fields, the window-panorama asset and its source docs. The `bus-ride-access` tip, bell flow, and bus state machine are unchanged. Verified with `npx tsc -b`, 107/107 vitest, `npx vite build`, and a headless-Chrome bell→old-city smoke test (chapter label "17路 · 车厢 → 白鸽巢 · 旧城街市").
+- 2026-08-06: Removed the sound-landmark collection system (knownLandmarks persistence, discoverLandmark, HUD 声音地标 counter, pause notes list, ending metric) while keeping the R-listen mechanic and its four touch+sound combo gates. Memories trimmed to three (old-city-bell, egg-tart 暖掌葡挞, ruins-rain 牌坊雨声) with a new MEMORY_DEFINITIONS catalog and pause-panel 记忆清单; HUD shows 记忆 n/3 and tips n/5; removed bus-rain and border-hand memories.
 - 2026-08-06: Read `plan1.md`, `AGENTS.md`, core scene state machines, NPC definitions, UI, styles, tests, and current screenshots.
 - Confirmed starting branch `main` tracks `origin/main`; no pre-existing source changes.
 - Added deterministic `window.render_game_to_text()` and `window.advanceTime(ms)` hooks for browser verification.

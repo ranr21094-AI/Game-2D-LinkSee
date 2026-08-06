@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { OLD_CITY_CROSSING } from "./content";
-import { BASE_WALK_SPEED, BELL_WINDOW_MS, busRideCheckpointAfterBell, checkpointForStage, COLOR_MEMORY_LIMIT, constrainCrossingPosition, determineEnding, effectiveWalkSpeed, isBusState, isKnownStage, mergeColorMemory, movementSpeedMultiplier, resumePointForStage, shouldStartWheelchairProcession, transitionBus, transitionCrossing } from "./flow";
+import { BASE_WALK_SPEED, BELL_WINDOW_MS, checkpointForStage, COLOR_MEMORY_LIMIT, constrainCrossingPosition, determineEnding, effectiveWalkSpeed, isBusState, isKnownStage, mergeColorMemory, movementSpeedMultiplier, oldCityCheckpointAfterBell, resumePointForStage, shouldStartWheelchairProcession, transitionBus, transitionCrossing } from "./flow";
 import { RUINS_DAUGHTER_END, RUINS_DAUGHTER_START, RUINS_LAM_END, RUINS_LAM_START, RUINS_PLAYER_END, RUINS_PLAYER_START, RUINS_PROCESSION_DURATION_MS, ruinsProcessionPositions } from "./ruins-map";
 import type { ResumeStage } from "./types";
 
@@ -36,12 +36,12 @@ describe("bus state machine", () => {
     expect(transitionBus("waiting", "sit")).toBe("waiting");
   });
 
-  it("routes the normal post-bell flow through the bus ride scene", () => {
-    expect(busRideCheckpointAfterBell("seated")).toEqual({
-      busState: "riding",
-      scene: "bus-ride",
-      objectiveId: "ride-to-camoes",
-      resumeStage: "bus-ride",
+  it("lands the post-bell flow directly in the old city without a ride scene", () => {
+    expect(oldCityCheckpointAfterBell("seated")).toEqual({
+      busState: "arrived",
+      scene: "old-city",
+      objectiveId: "request-crossing",
+      resumeStage: "old-city-entry",
     });
   });
 

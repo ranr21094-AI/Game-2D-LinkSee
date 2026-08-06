@@ -1,11 +1,9 @@
-import type { EndingChoice, KnownLandmarkId, OpeningReply } from "./types";
+import type { EndingChoice, MemoryId, OpeningReply } from "./types";
 
 export const JOURNEY_GOAL = "赴约：在大三巴与老友林伯会合";
 
 export const OPENING_REPLIES: ReadonlyArray<{ id: OpeningReply; label: string; echo: string }> = [
   { id: "old-place", label: "我会到，老地方见。", echo: "你答应过会到老地方。林伯一直记得。" },
-  { id: "careful", label: "雨后路滑，我会慢一点。", echo: "林伯先问你路上是否湿滑。你笑着说，慢一点也到了。" },
-  { id: "call-nearby", label: "到附近我再联系你。", echo: "你还没来得及再联系，林伯已经从脚步声里认出了你。" },
 ] as const;
 
 export const ENDING_CHOICES: ReadonlyArray<{ id: EndingChoice; label: string }> = [
@@ -14,19 +12,10 @@ export const ENDING_CHOICES: ReadonlyArray<{ id: EndingChoice; label: string }> 
   { id: "share-memories", label: "把一路想起的往事讲给林伯听" },
 ] as const;
 
-export const LANDMARK_NOTES: Record<KnownLandmarkId, string> = {
-  "gate-rain": "关闸站棚：雨点落在金属顶棚，声音清脆而集中。",
-  "route-17-engine": "17路候车区：巴士引擎声在站牌前方，凸字站牌靠近车门。",
-  "bus-card-reader": "17路车厢：刷卡机在上车后的右前方，会发出短促电子音。",
-  "bus-seat": "17路车厢：空座由软垫和金属座架共同确认。",
-  "bus-bell": "17路车厢：下车铃在座位附近，报站后可以用盲杖确认。",
-  "harbor-horn": "行车途中：内港汽笛意味着车辆正在接近旧城区。",
-  "old-city-crossing": "旧城路口：路缘点阵与连续双音共同确认通行时机。",
-  "flower-bell": "商铺街：花纸轻响和饼家风铃能帮助辨认店墙一侧。",
-  "egg-tart-oven": "葡挞摊：烤炉计时铃和酥皮香来自盲道旁的摊车。",
-  "pet-shop-bell": "猫记宠物：门铃在北向盲道右侧。",
-  "ruins-wheelchair": "大三巴坡道：轮椅轻响来自中央坡道入口。",
-  "ruins-rain": "大三巴牌坊：雨水沿石墙和坡道护栏落下。",
+export const MEMORY_DEFINITIONS: Record<MemoryId, { title: string; description: string }> = {
+  "old-city-bell": { title: "旧城风铃", description: "商铺短巷尽头，饼家的风铃在雨里轻轻响。林伯说，会走错路也算澳门的一部分。" },
+  "egg-tart": { title: "暖掌葡挞", description: "刚出炉的蛋挞暖在掌心，酥皮和甜香在雨夜格外清晰。" },
+  "ruins-rain": { title: "牌坊雨声", description: "大三巴牌坊下的雨声，和语音里林伯说的那个老地方连在一起。" },
 };
 
 export function openingReplyEcho(reply: OpeningReply | null): string {

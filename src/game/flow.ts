@@ -20,12 +20,15 @@ export function transitionBus(state: BusTransitState, action: BusAction): BusTra
   return BUS_TRANSITIONS[state]?.[action] ?? state;
 }
 
-export function busRideCheckpointAfterBell(state: BusTransitState): Pick<GameSnapshotV5, "busState" | "scene" | "objectiveId" | "resumeStage"> {
+export function oldCityCheckpointAfterBell(state: BusTransitState): Pick<GameSnapshotV5, "busState" | "scene" | "objectiveId" | "resumeStage"> {
+  // The bus-ride cutscene is gone: ringing the bell now lands directly in the
+  // old city. The bus state advances past riding to "arrived" so OldCityScene
+  // recognizes the arrival and alights the passenger on entry.
   return {
-    busState: transitionBus(state, "depart"),
-    scene: "bus-ride",
-    objectiveId: "ride-to-camoes",
-    resumeStage: "bus-ride",
+    busState: transitionBus(transitionBus(state, "depart"), "arrive"),
+    scene: "old-city",
+    objectiveId: "request-crossing",
+    resumeStage: "old-city-entry",
   };
 }
 
@@ -110,7 +113,6 @@ const CHECKPOINTS: Record<ResumeStage, Pick<GameSnapshotV5, "scene" | "objective
   "bus-interior-entry": { scene: "bus-interior", objectiveId: "find-card-reader", resumeStage: "bus-interior-entry", point: { x: 536, y: 76 } },
   "bus-interior-seat": { scene: "bus-interior", objectiveId: "find-seat", resumeStage: "bus-interior-seat", point: { x: 392, y: 148 } },
   "bus-interior-bell": { scene: "bus-interior", objectiveId: "ring-bell", resumeStage: "bus-interior-bell", point: { x: 392, y: 148 } },
-  "bus-ride": { scene: "bus-ride", objectiveId: "ride-to-camoes", resumeStage: "bus-ride", point: { x: 320, y: 180 } },
   "old-city-entry": { scene: "old-city", objectiveId: "request-crossing", resumeStage: "old-city-entry", point: { x: 40, y: 284 } },
   "old-city-wait": { scene: "old-city", objectiveId: "wait-crossing", resumeStage: "old-city-wait", point: { x: 40, y: 124 } },
   "old-city-go": { scene: "old-city", objectiveId: "cross-junction", resumeStage: "old-city-go", point: { x: 40, y: 124 } },
