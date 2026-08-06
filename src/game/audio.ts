@@ -2,6 +2,7 @@ import rainUrl from "../assets/audio/rain.ogg";
 import trafficUrl from "../assets/audio/traffic.ogg";
 import busInteriorUrl from "../assets/audio/bus-interior.ogg";
 import voicemailUrl from "../assets/audio/voicemail-lin.ogg";
+import { convertText } from "./i18n";
 import { getSnapshot } from "./store";
 import type { GroundTileKey } from "./ground-tiles";
 import type { SceneId } from "./types";
@@ -114,9 +115,11 @@ class AudioDirector {
 
   speak(text: string): void {
     if (!("speechSynthesis" in window) || this.paused) return;
+    const lang = getSnapshot().settings.assistiveTextLang;
+    const spoken = convertText(text, lang);
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "zh-CN";
+    const utterance = new SpeechSynthesisUtterance(spoken);
+    utterance.lang = lang === "zh-HK" ? "zh-HK" : "zh-CN";
     const settings = getSnapshot().settings;
     utterance.volume = Math.min(1, settings.masterVolume * settings.dialogueVolume);
     window.speechSynthesis.speak(utterance);

@@ -97,6 +97,8 @@ export type SoundLandmarkId =
   | "ruins-wheelchair"
   | "ruins-rain";
 
+export type AssistiveTextLang = "zh-CN" | "zh-HK";
+
 export type GameSettings = {
   masterVolume: number;
   ambientVolume: number;
@@ -105,6 +107,8 @@ export type GameSettings = {
   subtitleScale: number;
   reducedMotion: boolean;
   gameMode: GameMode;
+  /** 辅助文字语言：简体中文 / 繁體中文（港澳）。 */
+  assistiveTextLang: AssistiveTextLang;
 };
 
 export type ResumeStage =

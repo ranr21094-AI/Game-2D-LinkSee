@@ -54,7 +54,7 @@ describe("old-city merged tilemap", () => {
   });
 
   it("labels all eight brand-free shop signs", () => {
-    expect(SHOP_SIGNS.map((sign) => sign.name)).toEqual(["祐记士多", "海风咖啡", "德兴茶楼", "濠江银号", "猫记宠物", "同德按", "灯塔葡挞", "安记饼家"]);
+    expect(SHOP_SIGNS.map((sign) => sign.name)).toEqual(["祐記士多", "海風咖啡", "德興茶樓", "濠江銀號", "貓記寵物", "同德按", "燈塔葡撻", "安記餅家"]);
     const signDecorations = OLD_CITY_TILEMAP.decorations.filter((decoration) => decoration.kind === "shop-sign");
     expect(signDecorations).toHaveLength(8);
     signDecorations.forEach((decoration) => expect(decoration.label).toBeTruthy());

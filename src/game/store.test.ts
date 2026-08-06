@@ -39,6 +39,28 @@ describe("V5 game snapshot", () => {
     expect(getSnapshot()).toMatchObject({ scene: "bus-stop", objectiveId: "find-stop-sign", mobilityGuideSeen: false });
   });
 
+  it("defaults the assistive text language to 简体中文", () => {
+    expect(getSnapshot().settings.assistiveTextLang).toBe("zh-CN");
+  });
+
+  it("persists the assistive text language setting", () => {
+    patchSnapshot({ settings: { ...getSnapshot().settings, assistiveTextLang: "zh-HK" } });
+    expect(loadSnapshot()?.settings.assistiveTextLang).toBe("zh-HK");
+  });
+
+  it("keeps the chosen assistive text language across a new game", () => {
+    patchSnapshot({ settings: { ...getSnapshot().settings, assistiveTextLang: "zh-HK" } });
+    startNewGame();
+    expect(getSnapshot().settings.assistiveTextLang).toBe("zh-HK");
+  });
+
+  it("fills the default assistive text language when a save lacks it", () => {
+    const settingsWithoutLang = { ...getSnapshot().settings } as Record<string, unknown>;
+    delete settingsWithoutLang.assistiveTextLang;
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ ...getSnapshot(), settings: settingsWithoutLang }));
+    expect(loadSnapshot()?.settings.assistiveTextLang).toBe("zh-CN");
+  });
+
   it("persists completion of the manual sighted-guide introduction", () => {
     patchSnapshot({ mobilityGuideSeen: true });
     expect(loadSnapshot()).toMatchObject({ mobilityGuideSeen: true, resumeStage: "bus-stop-entry" });

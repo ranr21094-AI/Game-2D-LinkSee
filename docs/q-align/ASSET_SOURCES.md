@@ -44,6 +44,8 @@
 | `docs/q-align/bus-interior-modules-source.png` | 车厢模块图集生成记录与复核源图 | 仅作 ImageGen 生成记录；生产运行时使用去绿幕后模块图集，不使用整张车厢背景 |
 | `src/assets/bus-ride-access-tip-pixel.png` | 公交无障碍贴士完整公益插画 | 内置 ImageGen 生成单张暖灰雨夜像素车厢场景；盲人乘客与公众/司机通过姿态表现先询问、说清楚、再协助；无品牌、可读文字、水印或用户照片元素 |
 | `docs/q-align/gate-facade-source.png` | 已退役的关闸立面参考源图 | 仅保留为历史美术参考；生产代码不再导入或裁切该图。关闸现由 parapet/window/wall/canopy/pillar/entrance 六类 16px 程序化瓦片和代码文字牌组成，并进入统一 base/memory/warm 三态 |
+| `src/assets/egg-tart-vendor-pixel.png` | 蛋挞摊主精灵（64×64，全彩 warm 态） | Seedream（豆包生图）候选5：白色纸帽、微笑脸、深绿围裙内搭米色衬衫、双手端木托盘、三只金黄葡挞、深色长裤；纯绿幕 2048×2048 原图经 chroma-key（border 洪泛去绿）+ nearest-neighbor 缩至 64×64、脚基线 y=61；memory（saturate 0.35）与 base（grayscale）两态由代码在加载时派生 |
+| `docs/q-align/generated-sources/egg-tart-vendor-source.png` | 摊主生成记录与复核源图（候选5，2048×2048 纯绿幕） | 暖色调全彩像素人物，无文字、水印或 HUD |
 
 本轮建筑与过场提示约束为：雨夜暖灰澳门葡中建筑、16-bit 像素模块、统一比例；禁止 HUD、路线、品牌和非代码可读文字。章节图不含预绘制圆点或连线，关闸建筑完全瓦片化且不参与盲道逻辑。扶盲教学图允许人物，但正确动作和中文说明分别由插图与代码承担。
 

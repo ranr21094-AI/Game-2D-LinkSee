@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS: GameSnapshotV5["settings"] = {
   subtitleScale: 1,
   reducedMotion: false,
   gameMode: "experience",
+  assistiveTextLang: "zh-CN",
 };
 
 export function createInitialSnapshot(): GameSnapshotV5 {

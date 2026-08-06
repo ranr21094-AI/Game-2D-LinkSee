@@ -6,6 +6,7 @@ import { EGG_TART_STALL } from "./game/egg-tart";
 import { gameEvents, type TipSource } from "./game/events";
 import { checkpointForStage } from "./game/flow";
 import { endingChoiceCopy, JOURNEY_GOAL, MEMORY_DEFINITIONS, OPENING_REPLIES, openingReplyEcho } from "./game/journey";
+import { ASSISTIVE_TEXT_LANGS, t } from "./game/i18n";
 import type { NpcDialogue } from "./game/npcs";
 import { finishGame, getSnapshot, loadSnapshot, patchSnapshot, startNewGame } from "./game/store";
 import type { EndingId, GameSettings, GameSnapshotV5, HudState, TipId } from "./game/types";
@@ -23,7 +24,7 @@ const EMPTY_HUD: HudState = {
   prompt: "",
   memories: 0,
   detours: 0,
-  sceneLabel: "關閘 · 17路候车区",
+  sceneLabel: "关闸 · 17路候车区",
   hintCooling: false,
   flashCooling: false,
   listenCooling: false,
@@ -55,7 +56,7 @@ const ENDING_COPY: Record<EndingId, { title: string; body: string; quote: string
 type Screen = "menu" | "opening" | "tutorial" | "playing";
 type ChapterTransition = { from: SceneId; to: SceneId };
 const LIN_VOICE_MESSAGE = "小闻，雨小了。我在大三巴老地方等你。慢慢来，听到牌坊下的雨声就给我消息。";
-const routeChoiceLabel = (choice: GameSnapshotV5["routeChoice"]) => choice === "shop-wall" ? "店铺墙侧" : choice === "curb-edge" ? "路缘排水侧" : "尚未选择";
+const routeChoiceLabel = (choice: GameSnapshotV5["routeChoice"]) => t(choice === "shop-wall" ? "店铺墙侧" : choice === "curb-edge" ? "路缘排水侧" : "尚未选择");
 
 export function App() {
   const [screen, setScreen] = useState<Screen>("menu");
@@ -230,7 +231,6 @@ export function App() {
     patchSnapshot({ openingReply: reply });
     setSaved(getSnapshot());
     setOpeningChoiceMade(true);
-    audioDirector.speak(OPENING_REPLIES.find((item) => item.id === reply)?.echo ?? JOURNEY_GOAL);
   };
 
   const continueSaved = () => {
@@ -362,19 +362,24 @@ export function App() {
           <img className="title-art" src={chapterMapUrl} alt="" aria-hidden="true" />
           <div className="title-copy">
             <p className="eyebrow">A MACAU SOUND-TOUCH JOURNEY</p>
-            <h1 id="game-title">声路·澳门</h1>
-            <p className="title-subtitle">用盲杖读懂城市，搭乘17路去赴一场旧约。</p>
-            <div className="mode-select" role="group" aria-label="游戏模式">
-              <button aria-pressed={getSnapshot().settings.gameMode === "experience"} className={getSnapshot().settings.gameMode === "experience" ? "mode-option is-active" : "mode-option"} onClick={() => updateSetting("gameMode", "experience")}>体验模式</button>
-              <button aria-pressed={getSnapshot().settings.gameMode === "night"} className={getSnapshot().settings.gameMode === "night" ? "mode-option is-active" : "mode-option"} onClick={() => updateSetting("gameMode", "night")}>黑夜模式</button>
+            <h1 id="game-title">{t("声路·澳门")}</h1>
+            <p className="title-subtitle">{t("用盲杖读懂城市，搭乘17路去赴一场旧约。")}</p>
+            <div className="mode-select" role="group" aria-label={t("游戏模式")}>
+              <button aria-pressed={getSnapshot().settings.gameMode === "experience"} className={getSnapshot().settings.gameMode === "experience" ? "mode-option is-active" : "mode-option"} onClick={() => updateSetting("gameMode", "experience")}>{t("体验模式")}</button>
+              <button aria-pressed={getSnapshot().settings.gameMode === "night"} className={getSnapshot().settings.gameMode === "night" ? "mode-option is-active" : "mode-option"} onClick={() => updateSetting("gameMode", "night")}>{t("黑夜模式")}</button>
             </div>
-            <p className="mode-note">{getSnapshot().settings.gameMode === "night" ? "黑夜模式：未触碰处归于全黑，Q 仍提供方向与语音提示。" : "体验模式：触碰后的街景会留下淡彩记忆，适合首次旅程。"}</p>
+            <p className="mode-note">{getSnapshot().settings.gameMode === "night" ? t("黑夜模式：未触碰处归于全黑，Q 仍提供方向与语音提示。") : t("体验模式：触碰后的街景会留下淡彩记忆，适合首次旅程。")}</p>
+            <div className="lang-select" role="group" aria-label={t("辅助文字语言")}>
+              {ASSISTIVE_TEXT_LANGS.map((lang) => (
+                <button key={lang.id} aria-pressed={getSnapshot().settings.assistiveTextLang === lang.id} className={getSnapshot().settings.assistiveTextLang === lang.id ? "lang-option is-active" : "lang-option"} onClick={() => updateSetting("assistiveTextLang", lang.id)}>{lang.label}</button>
+              ))}
+            </div>
             <div className="title-actions">
-              <button className="primary-button" onClick={beginNew}>开始新旅程</button>
-              {saved && !saved.ending && <button className="secondary-button" onClick={continueSaved}>继续：{saved.scene === "bus-stop" ? "關閘" : saved.scene === "old-city" ? "白鸽巢" : "上次检查点"}</button>}
+              <button className="primary-button" onClick={beginNew}>{t("开始新旅程")}</button>
+              {saved && !saved.ending && <button className="secondary-button" onClick={continueSaved}>{t("继续：")}{saved.scene === "bus-stop" ? t("关闸") : saved.scene === "old-city" ? t("白鸽巢") : t("上次检查点")}</button>}
             </div>
-            <p className="disclaimer">桌面键盘游戏 · 建议开启声音体验盲杖与环境反馈</p>
-            <p className="access-note">当前版本未经视障人士实测，不代表真实失明体验或无障碍认证。</p>
+            <p className="disclaimer">{t("桌面键盘游戏 · 建议开启声音体验盲杖与环境反馈")}</p>
+            <p className="access-note">{t("当前版本未经视障人士实测，不代表真实失明体验或无障碍认证。")}</p>
           </div>
         </section>
       )}
@@ -382,20 +387,20 @@ export function App() {
       {screen === "opening" && (
         <section className="opening-screen" aria-labelledby="opening-title">
           <div className="opening-card pixel-panel">
-            <div className="old-photo" role="img" aria-label="一张雨后大三巴前的旧合照：年轻时的你与林伯并肩站在牌坊下">
+            <div className="old-photo" role="img" aria-label={t("一张雨后大三巴前的旧合照：年轻时的你与林伯并肩站在牌坊下")}>
               <img className="photo-img" src={oldPhotoUrl} alt="" aria-hidden="true" />
-              <small>大三巴 · 多年前</small>
+              <small>{t("大三巴 · 多年前")}</small>
             </div>
             <div className="opening-copy">
-              <p className="eyebrow">一条未读语音 · 林伯</p>
-              <h2 id="opening-title">今天，要去见一位老朋友</h2>
-              <p className="voice-message">“{LIN_VOICE_MESSAGE}”</p>
-              <div className="journey-contract" aria-label="本次旅程目标">
-                <span>旅程目标</span>
-                <strong>{JOURNEY_GOAL}</strong>
-                <small>你是一位低视力出行者。城市不会替你自动寻路；声音、盲杖和自己的判断会组成路线。</small>
+              <p className="eyebrow">{t("一条未读语音 · 林伯")}</p>
+              <h2 id="opening-title">{t("今天，要去见一位老朋友")}</h2>
+              <p className="voice-message">“{t(LIN_VOICE_MESSAGE)}”</p>
+              <div className="journey-contract" aria-label={t("本次旅程目标")}>
+                <span>{t("旅程目标")}</span>
+                <strong>{t(JOURNEY_GOAL)}</strong>
+                <small>{t("你是一位低视力出行者。城市不会替你自动寻路；声音、盲杖和自己的判断会组成路线。")}</small>
               </div>
-              <p className="reply-label">选择一条回复：</p>
+              <p className="reply-label">{t("选择一条回复：")}</p>
               <div className="opening-replies">
                 {OPENING_REPLIES.map((reply) => (
                   <button
@@ -403,13 +408,13 @@ export function App() {
                     className={getSnapshot().openingReply === reply.id ? "is-active" : ""}
                     aria-pressed={getSnapshot().openingReply === reply.id}
                     onClick={() => chooseOpeningReply(reply.id)}
-                  >{reply.label}</button>
+                  >{t(reply.label)}</button>
                 ))}
               </div>
               {openingChoiceMade && (
                 <div className="opening-echo" aria-live="polite">
-                  <p>{openingReplyEcho(getSnapshot().openingReply)}</p>
-                  <button className="primary-button" onClick={() => setScreen("tutorial")}>收好照片，准备出发</button>
+                  <p>{t(openingReplyEcho(getSnapshot().openingReply))}</p>
+                  <button className="primary-button" onClick={() => setScreen("tutorial")}>{t("收好照片，准备出发")}</button>
                 </div>
               )}
             </div>
@@ -420,64 +425,64 @@ export function App() {
       {screen === "tutorial" && (
         <section className="tutorial-screen" aria-labelledby="tutorial-title">
           <div className="tutorial-card pixel-panel">
-            <p className="eyebrow">出发前</p>
-            <h2 id="tutorial-title">先读懂脚下的路</h2>
-            <div className="tile-examples" aria-label="盲道样式示例">
-              <div className="tile-copy"><span className={`tutorial-tile guidance${tutorialPulse ? " is-lit" : ""}`} aria-hidden="true"><i /><i /><i /><i /></span><span><strong>四条凸纹</strong><small>{TUTORIAL_LINES[0]}</small></span></div>
-              <div className="tile-copy"><span className={`tutorial-tile decision${tutorialPulse ? " is-lit" : ""}`} aria-hidden="true">{Array.from({ length: 16 }, (_, index) => <i key={index} />)}</span><span><strong>4×4凸点</strong><small>{TUTORIAL_LINES[1]}</small></span></div>
+            <p className="eyebrow">{t("出发前")}</p>
+            <h2 id="tutorial-title">{t("先读懂脚下的路")}</h2>
+            <div className="tile-examples" aria-label={t("盲道样式示例")}>
+              <div className="tile-copy"><span className={`tutorial-tile guidance${tutorialPulse ? " is-lit" : ""}`} aria-hidden="true"><i /><i /><i /><i /></span><span><strong>{t("四条凸纹")}</strong><small>{t(TUTORIAL_LINES[0])}</small></span></div>
+              <div className="tile-copy"><span className={`tutorial-tile decision${tutorialPulse ? " is-lit" : ""}`} aria-hidden="true">{Array.from({ length: 16 }, (_, index) => <i key={index} />)}</span><span><strong>{t("4×4凸点")}</strong><small>{t(TUTORIAL_LINES[1])}</small></span></div>
             </div>
             <div className="key-grid">
-              <span><kbd>WASD / 方向键</kbd> 行走</span><span><kbd>Space</kbd> 一根盲杖敲击</span>
-              <span><kbd>Q</kbd> 方向指引</span><span><kbd>R</kbd> 驻足聆听</span>
-              <span><kbd>H</kbd> 重复双层目标</span><span><kbd>G</kbd> 照亮四周</span>
-              <span><kbd>E</kbd> 互动</span><span><kbd>Esc</kbd> 暂停</span>
+              <span><kbd>{t("WASD / 方向键")}</kbd> {t("行走")}</span><span><kbd>Space</kbd> {t("一根盲杖敲击")}</span>
+              <span><kbd>Q</kbd> {t("方向指引")}</span><span><kbd>R</kbd> {t("驻足聆听")}</span>
+              <span><kbd>H</kbd> {t("重复双层目标")}</span><span><kbd>G</kbd> {t("照亮四周")}</span>
+              <span><kbd>E</kbd> {t("互动")}</span><span><kbd>Esc</kbd> {t("暂停")}</span>
             </div>
-            <p className="tutorial-tip">城市以暖灰呈现。杖头触碰处会短暂恢复完整暖色；R 会让你停下 1.2 秒，报告左右与远近。室外离开盲道后，速度严格为盲道上的 35%；Q 只指出目标方向，不会显示整条路线。</p>
-            <button className={`tactile-demo${tutorialPulse ? " is-active" : ""}`} onClick={playTutorialTap}><kbd>Space</kbd><span><strong>先试听一次盲杖</strong><small>敲击凸纹，感受材质声音与暖色反馈</small></span></button>
-            <button className="primary-button" onClick={enterGame}>从拱北口岸门口出发</button>
+            <p className="tutorial-tip">{t("城市以暖灰呈现。杖头触碰处会短暂恢复完整暖色；R 会让你停下 1.2 秒，报告左右与远近。室外离开盲道后，速度严格为盲道上的 35%；Q 只指出目标方向，不会显示整条路线。")}</p>
+            <button className={`tactile-demo${tutorialPulse ? " is-active" : ""}`} onClick={playTutorialTap}><kbd>Space</kbd><span><strong>{t("先试听一次盲杖")}</strong><small>{t("敲击凸纹，感受材质声音与暖色反馈")}</small></span></button>
+            <button className="primary-button" onClick={enterGame}>{t("从拱北口岸门口出发")}</button>
           </div>
         </section>
       )}
 
       {screen === "playing" && (
-        <section className={`game-stage${getSnapshot().settings.gameMode === "night" ? " is-night" : ""}`} aria-label="声路澳门2D游戏" aria-hidden={modalOpen || undefined}>
-          <aside className="side-panel" aria-label="旅程功能栏">
+        <section className={`game-stage${getSnapshot().settings.gameMode === "night" ? " is-night" : ""}`} aria-label={t("声路澳门2D游戏")} aria-hidden={modalOpen || undefined}>
+          <aside className="side-panel" aria-label={t("旅程功能栏")}>
             <div className="hud-objective pixel-panel" aria-live="polite">
-              <span className="hud-label">旅程目标</span>
-              <strong className="journey-goal">{hud.journeyGoal}</strong>
-              <span className="hud-label immediate-label">眼前一步</span>
-              <strong>{hud.objective}</strong>
-              <small>{hud.sceneLabel}</small>
+              <span className="hud-label">{t("旅程目标")}</span>
+              <strong className="journey-goal">{t(hud.journeyGoal)}</strong>
+              <span className="hud-label immediate-label">{t("眼前一步")}</span>
+              <strong>{t(hud.objective)}</strong>
+              <small>{t(hud.sceneLabel)}</small>
             </div>
-            <div className="hud-memory pixel-panel" aria-label="旅程状态">
-              <span>记忆 {hud.memories} / {MEMORY_TOTAL}</span>
-              <span>危险纠偏 {String(hud.detours).padStart(2, "0")}</span>
+            <div className="hud-memory pixel-panel" aria-label={t("旅程状态")}>
+              <span>{t("记忆")} {hud.memories} / {MEMORY_TOTAL}</span>
+              <span>{t("危险纠偏")} {String(hud.detours).padStart(2, "0")}</span>
             </div>
             {hud.eggTartBoostRemainingMs > 0 && (
               <div className="boost-status pixel-panel" role="status" aria-live="polite">
                 <span aria-hidden="true">◈</span>
-                <strong>蛋挞余温 · +60%</strong>
+                <strong>{t("蛋挞余温 · +60%")}</strong>
                 <time>{Math.ceil(hud.eggTartBoostRemainingMs / 1000)}s</time>
               </div>
             )}
-            <button className="tips-entry" onClick={() => { pauseGame(); setShowTipsList(true); }} aria-label={`盲人小贴士，已解锁${getSnapshot().unlockedTips.length}条`}>
+            <button className="tips-entry" onClick={() => { pauseGame(); setShowTipsList(true); }} aria-label={t(`盲人小贴士，已解锁${getSnapshot().unlockedTips.length}条`)}>
               <span className="tips-entry-icon" aria-hidden="true">✦</span>
-              <span><strong>盲人小贴士</strong><small>已解锁 {getSnapshot().unlockedTips.length} / {TIP_TOTAL} 条</small></span>
+              <span><strong>{t("盲人小贴士")}</strong><small>{t("已解锁")} {getSnapshot().unlockedTips.length} / {TIP_TOTAL} {t("条")}</small></span>
             </button>
             <div className="hud-contact pixel-panel" aria-live="polite">
-              <span className="hud-label">最近触觉 · 一根盲杖</span>
-              <strong>{hud.contact}</strong>
-              {hud.contactHistory.length > 1 && <ol className="contact-history">{hud.contactHistory.slice(1).map((entry) => <li key={entry}>{entry}</li>)}</ol>}
+              <span className="hud-label">{t("最近触觉 · 一根盲杖")}</span>
+              <strong>{t(hud.contact)}</strong>
+              {hud.contactHistory.length > 1 && <ol className="contact-history">{hud.contactHistory.slice(1).map((entry) => <li key={entry}>{t(entry)}</li>)}</ol>}
             </div>
-            <div className="hud-controls pixel-panel" aria-label="操作提示">
-              <span><kbd>空格</kbd> 单杖敲击</span>
-              <span><kbd>Q</kbd> {hud.hintCooling ? "冷却" : "方向"}</span>
-              <span><kbd>R</kbd> {hud.listening ? "聆听中" : hud.listenCooling ? "冷却" : "聆听"}</span>
-              <span><kbd>H</kbd> 重复目标</span>
-              <span><kbd>G</kbd> {hud.flashCooling ? "冷却" : "照亮"}</span><span><kbd>E</kbd> 互动</span>
-              <span><kbd>F</kbd> 全屏</span>
+            <div className="hud-controls pixel-panel" aria-label={t("操作提示")}>
+              <span><kbd>空格</kbd> {t("单杖敲击")}</span>
+              <span><kbd>Q</kbd> {hud.hintCooling ? t("冷却") : t("方向")}</span>
+              <span><kbd>R</kbd> {hud.listening ? t("聆听中") : hud.listenCooling ? t("冷却") : t("聆听")}</span>
+              <span><kbd>H</kbd> {t("重复目标")}</span>
+              <span><kbd>G</kbd> {hud.flashCooling ? t("冷却") : t("照亮")}</span><span><kbd>E</kbd> {t("互动")}</span>
+              <span><kbd>F</kbd> {t("全屏")}</span>
             </div>
-            <button className="pause-button" onClick={() => { pauseGame(); setPaused(true); }} aria-label="暂停游戏">Esc 暂停</button>
+            <button className="pause-button" onClick={() => { pauseGame(); setPaused(true); }} aria-label={t("暂停游戏")}>{t("Esc 暂停")}</button>
             {import.meta.env.DEV && showDevTools && (
               <div className="dev-tools" aria-label="开发流程跳转">
                 <button onClick={() => jumpDev("bus-stop-sign", "doorOpen")}>候车</button>
@@ -499,15 +504,15 @@ export function App() {
             <div className="screen-shade" aria-hidden="true" />
             {(hud.subtitle || hud.prompt) && (
               <div className="dialogue-stack" style={{ fontSize: `${getSnapshot().settings.subtitleScale}em` }}>
-                {hud.subtitle && <p className="subtitle pixel-panel" aria-live="assertive">{hud.subtitle}</p>}
-                {hud.prompt && <p className="interact-prompt">{hud.prompt}</p>}
+                {hud.subtitle && <p className="subtitle pixel-panel" aria-live="assertive">{t(hud.subtitle)}</p>}
+                {hud.prompt && <p className="interact-prompt">{t(hud.prompt)}</p>}
               </div>
             )}
             {npcDialogue && (
               <section className="npc-dialogue pixel-panel" role="dialog" aria-modal="true" aria-labelledby="npc-dialogue-speaker">
-                <p className="eyebrow" id="npc-dialogue-speaker">{npcDialogue.speaker}</p>
-                <p className="npc-dialogue-prompt">{npcDialogue.prompt}</p>
-                <div className="npc-dialogue-options" role="group" aria-label="选择回应">
+                <p className="eyebrow" id="npc-dialogue-speaker">{t(npcDialogue.speaker)}</p>
+                <p className="npc-dialogue-prompt">{t(npcDialogue.prompt)}</p>
+                <div className="npc-dialogue-options" role="group" aria-label={t("选择回应")}>
                   {npcDialogue.options.map((option, index) => (
                     <button
                       key={option.id}
@@ -516,21 +521,21 @@ export function App() {
                       onMouseEnter={() => setNpcOptionIndex(index)}
                       onClick={() => chooseNpcOption(index)}
                     >
-                      <kbd>{index + 1}</kbd>{option.label}
+                      <kbd>{index + 1}</kbd>{t(option.label)}
                     </button>
                   ))}
                 </div>
-                <small>W/S 或方向键选择 · E/Enter 确认 · Esc 稍后再说</small>
+                <small>{t("W/S 或方向键选择 · E/Enter 确认 · Esc 稍后再说")}</small>
               </section>
             )}
             {chapter && (
               <div className={`chapter-interstitial${getSnapshot().settings.reducedMotion ? " is-reduced-motion" : ""}`} role="status" aria-live="polite">
-                <img src={chapterMapUrl} alt="澳门章节路线图" />
+                <img src={chapterMapUrl} alt={t("澳门章节路线图")} />
                 <div className="chapter-map-shade" />
                 <div className="chapter-copy pixel-panel">
-                  <span className="eyebrow">场景切换</span>
-                  <strong>{SCENE_LABELS[chapter.from]} → {SCENE_LABELS[chapter.to]}</strong>
-                  <small>任意键跳过</small>
+                  <span className="eyebrow">{t("场景切换")}</span>
+                  <strong>{t(SCENE_LABELS[chapter.from])} → {t(SCENE_LABELS[chapter.to])}</strong>
+                  <small>{t("任意键跳过")}</small>
                 </div>
               </div>
             )}
@@ -541,50 +546,58 @@ export function App() {
       {paused && !ending && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="pause-title" data-modal-active="true">
           <div className="pause-card pixel-panel">
-            <p className="eyebrow">旅程暂停</p>
-            <h2 id="pause-title">在雨声里停一会儿</h2>
-            <button ref={pausePrimaryRef} className="primary-button" onClick={resume}>继续行走</button>
+            <p className="eyebrow">{t("旅程暂停")}</p>
+            <h2 id="pause-title">{t("在雨声里停一会儿")}</h2>
+            <button ref={pausePrimaryRef} className="primary-button" onClick={resume}>{t("继续行走")}</button>
             <section className="route-notes" aria-labelledby="memory-list-title">
               <div>
-                <span className="hud-label">记忆清单</span>
-                <h3 id="memory-list-title">一路上亮起的往事</h3>
+                <span className="hud-label">{t("记忆清单")}</span>
+                <h3 id="memory-list-title">{t("一路上亮起的往事")}</h3>
               </div>
-              <p><strong>旧城走法：</strong>{routeChoiceLabel(getSnapshot().routeChoice)}。笔记只保存线索，不画自动导航路线。</p>
+              <p>{t(`旧城走法：${routeChoiceLabel(getSnapshot().routeChoice)}。笔记只保存线索，不画自动导航路线。`)}</p>
               {getSnapshot().memories.length ? (
-                <ol>{getSnapshot().memories.map((id) => <li key={id}><strong>{MEMORY_DEFINITIONS[id]?.title}</strong>：{MEMORY_DEFINITIONS[id]?.description}</li>)}</ol>
-              ) : <p className="route-notes-empty">还没有想起往事。途中触碰与聆听，会让它们亮起来。</p>}
+                <ol>{getSnapshot().memories.map((id) => <li key={id}><strong>{t(MEMORY_DEFINITIONS[id]?.title ?? "")}</strong>：{t(MEMORY_DEFINITIONS[id]?.description ?? "")}</li>)}</ol>
+              ) : <p className="route-notes-empty">{t("还没有想起往事。途中触碰与聆听，会让它们亮起来。")}</p>}
             </section>
-            <label className="setting-row">主音量
+            <label className="setting-row">{t("主音量")}
               <input type="range" min="0" max="1" step="0.05" value={getSnapshot().settings.masterVolume} onChange={(event) => updateSetting("masterVolume", Number(event.target.value))} />
             </label>
-            <label className="setting-row">环境音
+            <label className="setting-row">{t("环境音")}
               <input type="range" min="0" max="1" step="0.05" value={getSnapshot().settings.ambientVolume} onChange={(event) => updateSetting("ambientVolume", Number(event.target.value))} />
             </label>
-            <label className="setting-row">效果音
+            <label className="setting-row">{t("效果音")}
               <input type="range" min="0" max="1" step="0.05" value={getSnapshot().settings.effectsVolume} onChange={(event) => updateSetting("effectsVolume", Number(event.target.value))} />
             </label>
-            <label className="setting-row">对话音量
+            <label className="setting-row">{t("对话音量")}
               <input type="range" min="0" max="1" step="0.05" value={getSnapshot().settings.dialogueVolume} onChange={(event) => updateSetting("dialogueVolume", Number(event.target.value))} />
             </label>
-            <label className="setting-row">字幕大小
+            <label className="setting-row">{t("字幕大小")}
               <input type="range" min="0.9" max="1.5" step="0.1" value={getSnapshot().settings.subtitleScale} onChange={(event) => updateSetting("subtitleScale", Number(event.target.value))} />
             </label>
-            <label className="setting-row setting-toggle">减少动态效果
+            <label className="setting-row setting-toggle">{t("减少动态效果")}
               <input type="checkbox" checked={getSnapshot().settings.reducedMotion} onChange={(event) => updateSetting("reducedMotion", event.target.checked)} />
             </label>
-            <label className="setting-row setting-toggle">黑夜模式
+            <label className="setting-row setting-toggle">{t("黑夜模式")}
               <input type="checkbox" checked={getSnapshot().settings.gameMode === "night"} onChange={(event) => updateSetting("gameMode", event.target.checked ? "night" : "experience")} />
             </label>
+            <div className="setting-row setting-lang" role="group" aria-label={t("辅助文字语言")}>
+              <span className="setting-lang-label">{t("辅助文字")}</span>
+              <span className="lang-select lang-select-inline">
+                {ASSISTIVE_TEXT_LANGS.map((lang) => (
+                  <button key={lang.id} aria-pressed={getSnapshot().settings.assistiveTextLang === lang.id} className={getSnapshot().settings.assistiveTextLang === lang.id ? "lang-option is-active" : "lang-option"} onClick={() => updateSetting("assistiveTextLang", lang.id)}>{lang.label}</button>
+                ))}
+              </span>
+            </div>
             {!confirmReturn ? (
-              <button className="quiet-button" onClick={() => setConfirmReturn(true)}>请求帮助并结束旅程</button>
+              <button className="quiet-button" onClick={() => setConfirmReturn(true)}>{t("请求帮助并结束旅程")}</button>
             ) : (
               <div className="confirm-box">
-                <p>确定结束今天的旅程并进入“迷途折返”结局吗？</p>
-                <button className="danger-button" onClick={requestReturn}>确定结束</button>
-                <button className="quiet-button" onClick={() => setConfirmReturn(false)}>取消</button>
+                <p>{t("确定结束今天的旅程并进入“迷途折返”结局吗？")}</p>
+                <button className="danger-button" onClick={requestReturn}>{t("确定结束")}</button>
+                <button className="quiet-button" onClick={() => setConfirmReturn(false)}>{t("取消")}</button>
               </div>
             )}
-            <button className="quiet-button" onClick={backToMenu}>返回主菜单</button>
+            <button className="quiet-button" onClick={backToMenu}>{t("返回主菜单")}</button>
           </div>
         </div>
       )}
@@ -593,18 +606,18 @@ export function App() {
         <div className="modal-backdrop tips-list-backdrop" role="dialog" aria-modal="true" aria-labelledby="tips-list-title" data-modal-active="true">
           <article className="tips-list-card pixel-panel">
             <div className="mobility-guide-heading">
-              <p className="eyebrow">旅程收集</p>
-              <h2 id="tips-list-title">盲人小贴士</h2>
-              <p>已经解锁的贴士会留在这里，随时可以重新查看。</p>
+              <p className="eyebrow">{t("旅程收集")}</p>
+              <h2 id="tips-list-title">{t("盲人小贴士")}</h2>
+              <p>{t("已经解锁的贴士会留在这里，随时可以重新查看。")}</p>
             </div>
             <div className="tips-list">
               {getSnapshot().unlockedTips.map((id) => {
                 const tip = TIP_DEFINITIONS[id];
-                return <button key={id} className="tip-list-item" onClick={() => openTip(id)}><strong>{tip.title}</strong><span>{tip.summary}</span></button>;
+                return <button key={id} className="tip-list-item" onClick={() => openTip(id)}><strong>{t(tip.title)}</strong><span>{t(tip.summary)}</span></button>;
               })}
             </div>
-            {!getSnapshot().unlockedTips.length && <p className="tips-empty">还没有解锁贴士。继续走走看。</p>}
-            <button ref={tipsCloseRef} className="quiet-button" onClick={closeTipsList}>关闭</button>
+            {!getSnapshot().unlockedTips.length && <p className="tips-empty">{t("还没有解锁贴士。继续走走看。")}</p>}
+            <button ref={tipsCloseRef} className="quiet-button" onClick={closeTipsList}>{t("关闭")}</button>
           </article>
         </div>
       )}
@@ -613,16 +626,16 @@ export function App() {
         <div className="modal-backdrop mobility-guide-backdrop" role="dialog" aria-modal="true" aria-labelledby="mobility-guide-title" data-modal-active="true">
           <article className="mobility-guide-card pixel-panel">
             <div className="mobility-guide-heading">
-              <p className="eyebrow">{TIP_DEFINITIONS[tipModal.id].title}</p>
-              <h2 id="mobility-guide-title">{TIP_DEFINITIONS[tipModal.id].heading}</h2>
-              <p>{TIP_DEFINITIONS[tipModal.id].summary}</p>
+              <p className="eyebrow">{t(TIP_DEFINITIONS[tipModal.id].title)}</p>
+              <h2 id="mobility-guide-title">{t(TIP_DEFINITIONS[tipModal.id].heading)}</h2>
+              <p>{t(TIP_DEFINITIONS[tipModal.id].summary)}</p>
             </div>
-            <img src={TIP_DEFINITIONS[tipModal.id].image} alt={TIP_DEFINITIONS[tipModal.id].imageAlt} />
+            <img src={TIP_DEFINITIONS[tipModal.id].image} alt={t(TIP_DEFINITIONS[tipModal.id].imageAlt)} />
             <ol className="mobility-guide-steps">
-              {TIP_DEFINITIONS[tipModal.id].steps.map((step) => <li key={step.title}><strong>{step.title}</strong><span>{step.body}</span></li>)}
+              {TIP_DEFINITIONS[tipModal.id].steps.map((step) => <li key={step.title}><strong>{t(step.title)}</strong><span>{t(step.body)}</span></li>)}
             </ol>
-            <p className="mobility-guide-callout">{TIP_DEFINITIONS[tipModal.id].callout}</p>
-            <button ref={tipCloseRef} className="primary-button" onClick={dismissTip}>{tipModal.source === "intro" ? "我知道了，前往盲道起点" : "关闭贴士"}</button>
+            <p className="mobility-guide-callout">{t(TIP_DEFINITIONS[tipModal.id].callout)}</p>
+            <button ref={tipCloseRef} className="primary-button" onClick={dismissTip}>{tipModal.source === "intro" ? t("我知道了，前往盲道起点") : t("关闭贴士")}</button>
           </article>
         </div>
       )}
@@ -630,16 +643,16 @@ export function App() {
       {endingCopy && (
         <div className="modal-backdrop ending-backdrop" role="dialog" aria-modal="true" aria-labelledby="ending-title" data-modal-active="true">
           <article className="ending-card pixel-panel">
-            <p className="eyebrow">旅程终章</p>
-            <h2 id="ending-title">{endingCopy.title}</h2>
-            <p>{endingCopy.body}</p>
-            <blockquote>{endingCopy.quote}</blockquote>
+            <p className="eyebrow">{t("旅程终章")}</p>
+            <h2 id="ending-title">{t(endingCopy.title)}</h2>
+            <p>{t(endingCopy.body)}</p>
+            <blockquote>{t(endingCopy.quote)}</blockquote>
             <dl className="ending-metrics">
-              <div><dt>记忆</dt><dd>{getSnapshot().memories.length} / {MEMORY_TOTAL}</dd></div>
-              <div><dt>危险纠偏</dt><dd>{getSnapshot().detourScore}</dd></div>
-              <div><dt>旧城走法</dt><dd>{routeChoiceLabel(getSnapshot().routeChoice)}</dd></div>
+              <div><dt>{t("记忆")}</dt><dd>{getSnapshot().memories.length} / {MEMORY_TOTAL}</dd></div>
+              <div><dt>{t("危险纠偏")}</dt><dd>{getSnapshot().detourScore}</dd></div>
+              <div><dt>{t("旧城走法")}</dt><dd>{t(routeChoiceLabel(getSnapshot().routeChoice))}</dd></div>
             </dl>
-            <button ref={endingPrimaryRef} className="primary-button" onClick={backToMenu}>回到主菜单</button>
+            <button ref={endingPrimaryRef} className="primary-button" onClick={backToMenu}>{t("回到主菜单")}</button>
           </article>
         </div>
       )}

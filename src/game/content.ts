@@ -56,7 +56,7 @@ export const TIP_DEFINITIONS: Record<TipId, TipDefinition> = {
     imageAlt: "暖灰雨夜像素插图：盲人乘客在公交车内寻找刷卡机或按铃，一名公众先询问再说明位置并准备协助",
     steps: [
       { title: "统一位置与触感", body: "固定刷卡机和按铃的高度、位置，并提供明显的触觉与声音提示。" },
-      { title: "让信息顺手可用", body: "在視障助乘巴士報站等常用 App 中集成乘车码与到站提醒，让刷卡与提醒成为顺手操作。" },
+      { title: "让信息顺手可用", body: "在视障助乘巴士报站等常用 App 中集成乘车码与到站提醒，让刷卡与提醒成为顺手操作。" },
       { title: "报站时说清楚", body: "说明车门、按铃位置和下车方向；公众或工作人员协助前先征得同意。" },
     ],
     callout: "无障碍不是让乘客记住每辆车的不同，而是让每辆车都更容易被理解。",
@@ -99,7 +99,7 @@ export const ROUTE_BRIEFINGS: Record<"bus-stop" | "bus-interior", string> = {
 };
 
 export const SCENE_LABELS: Record<SceneId, string> = {
-  "bus-stop": "關閘 · 17路候车区",
+  "bus-stop": "关闸 · 17路候车区",
   "bus-interior": "17路 · 车厢",
   "old-city": "白鸽巢 · 旧城街市",
   ruins: "大三巴牌坊",

@@ -6,6 +6,7 @@ import ruinsFacadeBaseUrl from "../assets/ruins-facade-base.png";
 import ruinsFacadeMemoryUrl from "../assets/ruins-facade-memory.png";
 import busInteriorModulesUrl from "../assets/bus-interior-modules-pixel.png";
 import ruinsFacadeWarmUrl from "../assets/ruins-facade-warm.png";
+import eggTartVendorUrl from "../assets/egg-tart-vendor-pixel.png";
 import { TREE_TEXTURE, type GroundVisualState } from "./ground-tiles";
 import type { DecorationKind, MapDecoration } from "./tilemap";
 
@@ -118,28 +119,60 @@ function drawBusDriver(ctx: CanvasRenderingContext2D, state: GroundVisualState):
 function drawEggTartVendor(ctx: CanvasRenderingContext2D, state: GroundVisualState): void {
   const p = PALETTES[state];
   ctx.clearRect(0, 0, 64, 64);
-  // Shared 64px human scale: feet at y=62, head height and shoulders align
-  // with the traveler sprite, with a small tray held at waist height.
-  rect(ctx, p.dark, 23, 8, 20, 4);
-  rect(ctx, p.wood, 21, 12, 24, 18);
-  rect(ctx, p.cream, 24, 14, 18, 13);
-  rect(ctx, p.dark, 21, 20, 4, 9);
-  rect(ctx, p.dark, 26, 10, 16, 4);
-  rect(ctx, p.green, 20, 29, 25, 22);
-  rect(ctx, p.cream, 25, 31, 15, 18);
-  rect(ctx, p.dark, 18, 31, 5, 20);
-  rect(ctx, p.dark, 43, 31, 5, 20);
-  rect(ctx, p.wood, 16, 39, 34, 7);
-  rect(ctx, p.cream, 18, 40, 30, 2);
-  [21, 31, 41].forEach((x) => {
-    rect(ctx, p.wood, x, 35, 7, 5);
-    rect(ctx, p.tart, x + 1, 34, 5, 4);
-    rect(ctx, p.dark, x + 2, 35, 3, 1);
+  // Classic Macau egg-tart vendor: white paper cap, smiling face, green apron,
+  // both hands gripping a wooden tray of three golden tarts. Shared 64px human
+  // scale: feet at y=62, head/shoulders align with the traveler sprite.
+  // White paper cap with a soft crown and a flat brim.
+  rect(ctx, p.light, 25, 1, 14, 3);
+  rect(ctx, p.light, 23, 3, 18, 4);
+  rect(ctx, p.cream, 26, 2, 10, 2);
+  rect(ctx, p.light, 22, 6, 20, 3);
+  rect(ctx, p.stone, 22, 9, 20, 2);
+  rect(ctx, p.light, 21, 11, 22, 2);
+  rect(ctx, p.cream, 23, 10, 18, 1);
+  // Hair fringe peeking under the brim.
+  rect(ctx, p.dark, 23, 13, 18, 2);
+  rect(ctx, p.dark, 21, 14, 3, 2);
+  rect(ctx, p.dark, 40, 14, 3, 2);
+  // Face with eyes, blush and a small smile.
+  rect(ctx, p.cream, 24, 15, 16, 8);
+  rect(ctx, p.cream, 25, 22, 14, 3);
+  rect(ctx, p.dark, 27, 18, 2, 2);
+  rect(ctx, p.dark, 35, 18, 2, 2);
+  rect(ctx, p.red, 25, 20, 3, 2);
+  rect(ctx, p.red, 36, 20, 3, 2);
+  rect(ctx, p.dark, 30, 22, 4, 1);
+  // Collar, then the cream shirt torso with the green apron over the front.
+  rect(ctx, p.light, 24, 25, 16, 3);
+  rect(ctx, p.light, 20, 27, 24, 15);
+  rect(ctx, p.green, 22, 28, 20, 14);
+  rect(ctx, p.green, 21, 28, 22, 3);
+  rect(ctx, p.cream, 20, 28, 3, 4);
+  rect(ctx, p.cream, 41, 28, 3, 4);
+  rect(ctx, p.wood, 26, 35, 12, 5);
+  rect(ctx, p.dark, 26, 35, 12, 1);
+  // Arms with hands gripping the tray.
+  rect(ctx, p.light, 16, 29, 5, 12);
+  rect(ctx, p.light, 43, 29, 5, 12);
+  rect(ctx, p.cream, 15, 40, 6, 3);
+  rect(ctx, p.cream, 43, 40, 6, 3);
+  // Wooden tray held at waist height.
+  rect(ctx, p.wood, 14, 42, 36, 4);
+  rect(ctx, p.dark, 14, 46, 36, 2);
+  rect(ctx, p.wood, 14, 42, 2, 5);
+  rect(ctx, p.wood, 48, 42, 2, 5);
+  // Three golden custard tarts as the warm focal point.
+  [17, 28, 39].forEach((x) => {
+    rect(ctx, p.wood, x, 39, 8, 4);
+    rect(ctx, p.tart, x + 1, 38, 6, 3);
+    rect(ctx, p.glow, x + 2, 38, 4, 1);
+    rect(ctx, p.dark, x + 3, 39, 2, 2);
   });
-  rect(ctx, p.dark, 23, 50, 8, 11);
-  rect(ctx, p.dark, 36, 50, 8, 11);
-  rect(ctx, p.metal, 20, 60, 13, 3);
-  rect(ctx, p.metal, 35, 60, 13, 3);
+  // Legs and shoes.
+  rect(ctx, p.dark, 23, 48, 8, 11);
+  rect(ctx, p.dark, 33, 48, 8, 11);
+  rect(ctx, p.metal, 21, 59, 11, 3);
+  rect(ctx, p.metal, 32, 59, 11, 3);
 }
 
 function drawProgrammatic(ctx: CanvasRenderingContext2D, kind: DecorationKind, width: number, height: number, state: GroundVisualState, orientation?: BusSeatOrientation): void {
@@ -160,7 +193,7 @@ function drawProgrammatic(ctx: CanvasRenderingContext2D, kind: DecorationKind, w
     ctx.font = `700 12px "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("澳门欢迎您", width / 2, 48);
+    ctx.fillText("澳門歡迎您", width / 2, 48);
     // end posts with base plates (no middle post)
     [12, width - 12].forEach((x) => {
       rect(ctx, p.metal, x - 3, 16, 6, height - 22);
@@ -263,17 +296,62 @@ function drawProgrammatic(ctx: CanvasRenderingContext2D, kind: DecorationKind, w
   }
 }
 
+/** Stamp one vendor state into a fresh 64×64 canvas from the loaded PNG source. */
+function stampEggTartVendorState(scene: Phaser.Scene, key: string, mode: "warm" | "memory" | "base"): void {
+  if (scene.textures.exists(key)) return;
+  const source = scene.textures.get("egg-tart-vendor-source").getSourceImage() as CanvasImageSource;
+  if (!source) return;
+  const texture = scene.textures.createCanvas(key, 64, 64);
+  if (!texture) return;
+  const ctx = texture.getContext();
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(source, 0, 0, 64, 64);
+  if (mode !== "warm") {
+    // Deterministic per-pixel transform (no reliance on ctx.filter): memory
+    // keeps ~22% of the color (matching the environment memory palette), base
+    // is a true luma grayscale so the night silhouette never shows tint.
+    const data = ctx.getImageData(0, 0, 64, 64);
+    const px = data.data;
+    for (let i = 0; i < px.length; i += 4) {
+      const r = px[i];
+      const g = px[i + 1];
+      const b = px[i + 2];
+      const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+      if (mode === "base") {
+        px[i] = px[i + 1] = px[i + 2] = luma;
+      } else {
+        px[i] = luma + (r - luma) * 0.22;
+        px[i + 1] = luma + (g - luma) * 0.22;
+        px[i + 2] = luma + (b - luma) * 0.22;
+      }
+    }
+    ctx.putImageData(data, 0, 0);
+  }
+  texture.refresh();
+}
+
 export function ensureEggTartVendorTextures(scene: Phaser.Scene): Record<GroundVisualState, string> {
   const textures = {} as Record<GroundVisualState, string>;
-  STATES.forEach((state) => {
-    const key = `egg-tart-vendor-${state}`;
-    textures[state] = key;
-    if (scene.textures.exists(key)) return;
-    const texture = scene.textures.createCanvas(key, 64, 64);
-    if (!texture) return;
-    drawEggTartVendor(texture.getContext(), state);
-    texture.refresh();
-  });
+  STATES.forEach((state) => { textures[state] = `egg-tart-vendor-${state}`; });
+  const hasSource = scene.textures.exists("egg-tart-vendor-source") &&
+    !!scene.textures.get("egg-tart-vendor-source").getSourceImage();
+  if (hasSource) {
+    // PNG sprite path: the loaded image is the vivid "warm" (lit) state; the
+    // muted "memory" and grayscale "base" states are derived at load time so
+    // the three-state lighting keeps working with a single source image.
+    stampEggTartVendorState(scene, textures.warm, "warm");
+    stampEggTartVendorState(scene, textures.memory, "memory");
+    stampEggTartVendorState(scene, textures.base, "base");
+  } else {
+    // Fallback: procedural vendor so a missing asset never blanks the NPC.
+    STATES.forEach((state) => {
+      if (scene.textures.exists(textures[state])) return;
+      const texture = scene.textures.createCanvas(textures[state], 64, 64);
+      if (!texture) return;
+      drawEggTartVendor(texture.getContext(), state);
+      texture.refresh();
+    });
+  }
   return textures;
 }
 
@@ -285,6 +363,7 @@ export function preloadEnvironmentAssets(scene: Phaser.Scene): void {
   if (!scene.textures.exists(RUINS_FACADE_TEXTURE.memory)) scene.load.image(RUINS_FACADE_TEXTURE.memory, ruinsFacadeMemoryUrl);
   if (!scene.textures.exists(RUINS_FACADE_TEXTURE.warm)) scene.load.image(RUINS_FACADE_TEXTURE.warm, ruinsFacadeWarmUrl);
   if (!scene.textures.exists("bus-interior-modules")) scene.load.image("bus-interior-modules", busInteriorModulesUrl);
+  if (!scene.textures.exists("egg-tart-vendor-source")) scene.load.image("egg-tart-vendor-source", eggTartVendorUrl);
 }
 
 const STATES: GroundVisualState[] = ["base", "memory", "warm"];
@@ -385,7 +464,7 @@ function ensureGateSignTextures(scene: Phaser.Scene): Record<GroundVisualState, 
     rect(ctx, p.dark, 0, 0, 112, 26); rect(ctx, p.glow, 2, 2, 108, 22); rect(ctx, p.dark, 4, 4, 104, 18);
     ctx.font = '700 14px "Noto Serif CJK SC", "SimSun", serif';
     ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = p.glow;
-    ctx.fillText("拱北口岸", 56, 13);
+    ctx.fillText("拱北口岸", 56, 13); // 繁简同形，无需转换
     texture.refresh();
   });
   return keys;
