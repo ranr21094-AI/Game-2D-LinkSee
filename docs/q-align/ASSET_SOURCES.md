@@ -33,8 +33,8 @@
 | `docs/q-align/generated-sources/lam-wheelchair-source.png` | 轮椅林伯生成记录与复核源图 | 三个互不重叠的暖灰像素姿态，纯绿幕，无盲杖、文字、品牌或 HUD |
 | `src/assets/lam-daughter-push.png` | 林伯成年女儿三帧精灵（陪伴站立、两帧推行步态） | 内置 ImageGen 参考玩家背向比例生成；绿幕去除后按统一比例缩为 64×64/帧，双手保持在轮椅推把高度 |
 | `docs/q-align/generated-sources/lam-daughter-push-source.png` | 女儿推行生成记录与复核源图 | 三个背向推行姿态，纯绿幕，不包含轮椅、文字、品牌或 HUD |
-| `src/assets/wheelchair-pushing-tip-pixel.png` | “轮椅推行需要学习”完整横向公益插画（960×480） | 内置 ImageGen 生成三段连续场景：检查脚踏板、平稳上坡、控制下坡；用户参考图仅用于动作关系，不复制人物、排版、文字或水印 |
-| `docs/q-align/generated-sources/wheelchair-pushing-tip-source.png` | 轮椅推行贴士生成记录与复核源图 | 暖灰雨夜澳门像素场景，无品牌、可读文字、箭头、HUD 或水印；中文标题与安全说明由 React 叠加 |
+| `src/assets/wheelchair-pushing-tip-pixel.png` | “轮椅推行需要学习”完整横向公益插画（960×480） | Seedream（豆包生图）生成三段连续场景：检查双手与脚踏板、沿坡道向上推行身体前倾、下坡背对坡道倒退并控制刹车；用户参考图仅用于动作关系，不复制人物、排版、文字或水印 |
+| `docs/q-align/generated-sources/wheelchair-pushing-tip-source.png` | 轮椅推行贴士生成记录与复核源图（3072×1536 原图） | 暖灰雨夜澳门像素场景，无品牌、可读文字、箭头、HUD 或水印；中文标题与安全说明由 React 叠加 |
 | `src/assets/guide-dog-tip-pixel.png` | "导盲犬在澳门"完整横向公益插画（960×480） | Seedream（豆包生图）生成三段连续场景：视障者与导盲犬被挡在贴有禁宠标志的门外、检疫柜台前导盲犬隔离笼与成堆文件、导盲机器人止步于楼梯前；无品牌、可读文字、水印或真实人物元素 |
 | `docs/q-align/generated-sources/guide-dog-tip-source.png` | 导盲犬贴士生成记录与复核源图（3072×1536 原图） | 暖灰雨夜澳门像素场景；中文标题与制度说明由 React 叠加 |
 | `src/assets/sighted-guide-tutorial-pixel.png` | 口岸序章的扶盲教学三格插图（960×520） | 内置 ImageGen 参考用户提供的动作说明图，仅保留正确动作关系并改为暖灰雨夜像素风；裁去外边距、nearest-neighbor 缩放并量化为 128 色；所有中文说明由 React 叠加 |
@@ -47,7 +47,7 @@
 
 本轮建筑与过场提示约束为：雨夜暖灰澳门葡中建筑、16-bit 像素模块、统一比例；禁止 HUD、路线、品牌和非代码可读文字。章节图不含预绘制圆点或连线，车窗图只作为窄幅模块，关闸建筑完全瓦片化且不参与盲道逻辑。扶盲教学图允许人物，但正确动作和中文说明分别由插图与代码承担。
 
-轮椅推行贴士文案根据 [NHS 标准轮椅安全信息](https://www.fhft.nhs.uk/patients-and-visitors/patient-information-library/wheelchair-safety-information-standard-wheelchairs) 与 [WHO 轮椅服务培训资料](https://www.who.int/publications/i/item/9789241512398) 整理，强调先询问、移动前说明、检查脚踏板与轮子周围、全程控制速度，并在坡度或操作超出能力时停止和寻求受训协助；未使用未经核实的统计数字。
+轮椅推行贴士文案根据 [NHS 标准轮椅安全信息](https://www.fhft.nhs.uk/patients-and-visitors/patient-information-library/wheelchair-safety-information-standard-wheelchairs) 与 [WHO 轮椅服务培训资料](https://www.who.int/publications/i/item/9789241512398) 整理，强调先询问、移动前说明、检查双手与脚踏板、平地不得突然加速/急刹/急转、上坡身体前倾缓慢推进、下坡背对坡道倒退行进并全程控刹车、上下台阶先停稳再踩倾斜杆操作，并在坡度或操作超出能力时停止和寻求受训协助；未使用未经核实的统计数字。
 
 导盲犬贴士文案基于项目所有者提供的澳门现况要点整理：法律未承认导盲犬工作犬身份、需以"宠物狗"名义申请入境并经历复杂检疫隔离流程、个案购买需议员协助推动；政府倾向发展"电子导盲犬"（导盲机器人），成本低、无需医疗照护，但无法应对楼梯等复杂地形。文案为定性表述，未使用未经核实的统计数字；正式对外发布前建议由本地无障碍团体复核。
 

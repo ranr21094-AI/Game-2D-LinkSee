@@ -100,9 +100,9 @@ describe("tactile path definitions", () => {
     expect(wheelchairTip.title).toBe("轮椅推行需要学习");
     expect(wheelchairTip.heading).toBe("会推轮椅，不只是向前用力");
     expect(wheelchairTip.image).toContain("wheelchair-pushing-tip-pixel");
-    expect(wheelchairTip.steps).toHaveLength(3);
-    expect(wheelchairTip.steps.map((step) => step.title)).toEqual(["先问再检查", "平地与上坡", "下坡与障碍"]);
-    expect(wheelchairTip.callout).toContain("不拿乘客安全试错");
+    expect(wheelchairTip.steps).toHaveLength(5);
+    expect(wheelchairTip.steps.map((step) => step.title)).toEqual(["先问再检查", "平地前进", "上坡", "下坡", "上下台阶"]);
+    expect(wheelchairTip.callout).toContain("下坡倒退并控制刹车");
     const guideDogTip = TIP_DEFINITIONS["guide-dog-access"];
     expect(guideDogTip.title).toBe("导盲犬在澳门");
     expect(guideDogTip.heading).toBe("在澳门，导盲犬仍是「宠物」");
